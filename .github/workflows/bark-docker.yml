@@ -35,7 +35,7 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ghcr.io/jonkoduif/beathole-bark:v30
+            ghcr.io/jonkoduif/beathole-bark:v31
             ghcr.io/jonkoduif/beathole-bark:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max

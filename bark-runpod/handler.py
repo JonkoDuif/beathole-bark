@@ -234,69 +234,379 @@ def upload_stem(backend_url: str, api_key: str, beat_id: str, stem_name: str, wa
 # ── Genre / mood / instrument vocabulary ──────────────────────────────────────
 # ═══════════════════════════════════════════════════════════════════════════════
 
-GENRE_BASES = {
-    "trap":          "trap beat, Atlanta trap, hard 808 bass, dark production",
-    "drill":         "UK drill, dark gritty production, London drill style",
-    "hip hop":       "hip hop beat, boom bap, groove-driven rhythm",
-    "hip-hop":       "hip hop beat, boom bap production style",
-    "boom bap":      "classic boom bap, vinyl-texture, golden era hip hop",
-    "r&b":           "R&B, smooth soulful production, warm polished mix",
-    "afrobeats":     "afrobeats, vibrant African percussion groove",
-    "dancehall":     "dancehall riddim, Caribbean rhythm, digital production",
-    "lo-fi":         "lo-fi hip hop, vintage warm texture, chill nostalgic aesthetic",
-    "electronic":    "electronic music, synthesizer-driven, modern production",
-    "house":         "house music, four-on-the-floor groove, electronic dance",
-    "deep house":    "deep house, warm sub bass, soulful house groove",
-    "tech house":    "tech house, punchy percussion, hypnotic groove",
-    "techno":        "techno, industrial percussion, dark driving rhythm",
-    "edm":           "EDM, energetic build-ups and drops, powerful electronic",
-    "dubstep":       "dubstep, massive wobble bass, half-time rhythm, heavy drops",
-    "drum and bass": "drum and bass, fast breakbeats, heavy sub bass",
-    "dnb":           "drum and bass, fast amen break, rolling sub bass",
-    "jungle":        "jungle, chopped amen break, reggae bass, 160 BPM",
-    "reggaeton":     "reggaeton, dembow rhythm, Latin urban production",
-    "latin":         "Latin beat, percussion-driven, rhythmic Latin groove",
-    "jazz":          "jazz-influenced, complex chord harmony, live instrumentation",
-    "soul":          "soul music, warm live instrumentation, groove-based",
-    "funk":          "funk beat, syncopated groove, punchy bass",
-    "pop":           "pop music, catchy hook-driven melody, polished radio production",
-    "cinematic":     "cinematic orchestral score, epic dramatic production",
-    "ambient":       "ambient electronic, atmospheric pads, spacious textured production",
-    "phonk":         "phonk, Memphis rap style, dark distorted 808, cowbell",
-    "cloud rap":     "cloud rap, hazy atmospheric production, ambient trap",
-    "grime":         "grime, UK urban production, staccato synths, 140 BPM",
-    "uk garage":     "UK garage, shuffled 2-step beat, soulful groove",
-    "synthwave":     "synthwave, 80s retro electronic, analog synthesizer",
-    "vaporwave":     "vaporwave, slowed retro aesthetic, nostalgic electronic",
-    "hyperpop":      "hyperpop, glitchy distorted pop, maximalist electronic",
-    "pluggnb":       "pluggnb, smooth dark melodic trap, melodic plug beat",
-    "jersey club":   "jersey club, chopped samples, 4x4 kick, club energy",
-    "reggae":        "reggae, offbeat guitar skank, one-drop rhythm, Caribbean groove",
-    "gospel":        "gospel, powerful choir, driving rhythm, uplifting production",
-    "blues":         "blues, guitar riff, 12-bar progression, soulful expression",
-    "rock":          "rock, live drums, electric guitar, bass-driven groove",
+# Multiple variants per genre — one picked randomly each generation so beats
+# never sound identical even with the same settings.
+GENRE_VARIANTS = {
+    "trap": [
+        "dark Atlanta trap, thunderous 808 slides, chopped soul sample, ominous minor melody",
+        "hard trap banger, distorted 808 sub bass, pitched vocal chop loop, menacing atmosphere",
+        "midnight trap, slow dark 808, haunting piano sample, trap hi-hat rolls",
+        "cinematic trap, orchestral strings over 808 bass, epic dark production, cold atmosphere",
+        "melodic trap, emotional piano loop, heavy sliding 808, introspective dark energy",
+    ],
+    "drill": [
+        "UK drill, cold sliding 808, sparse ominous melody, dark gritty street sound",
+        "Brooklyn drill, hard knocking drums, eerie piano loop, aggressive dark production",
+        "Chicago drill, menacing minor chords, thunderous kick, off-beat 808 hits",
+        "UK drill banger, chilling string stabs, heavy sub bass, dark brooding atmosphere",
+        "melodic drill, haunting flute loop over dark 808, cold emotional energy",
+    ],
+    "hip hop": [
+        "soulful hip hop, warm vinyl-sampled piano, deep punchy kick, jazzy groove",
+        "dusty hip hop, muffled soul chop, swinging hi-hats, warm analog texture",
+        "dark hip hop, cinematic orchestral sample, boom bap rhythm, underground feel",
+        "smooth hip hop, lush Rhodes melody, deep groove, relaxed head-nodding vibe",
+        "raw hip hop, gritty sampled horn stab, knocking drums, street authenticity",
+    ],
+    "hip-hop": [
+        "soulful hip hop, warm vinyl-sampled piano, deep punchy kick, jazzy groove",
+        "dusty hip hop, muffled soul chop, swinging hi-hats, warm analog texture",
+        "dark hip hop, cinematic orchestral sample, boom bap rhythm, underground feel",
+        "smooth hip hop, lush Rhodes melody, deep groove, relaxed head-nodding vibe",
+    ],
+    "boom bap": [
+        "classic boom bap, dusty vinyl sample, deep rimshot snare, loose swinging hi-hats",
+        "golden era boom bap, soulful horn sample, hard punchy kick, jazz-infused groove",
+        "gritty boom bap, chopped vocal sample, crackly vinyl texture, underground rawness",
+        "cinematic boom bap, orchestral brass sample, booming kick, timeless old-school feel",
+    ],
+    "r&b": [
+        "silky smooth R&B, warm Fender Rhodes chords, lush reverb, intimate late-night feel",
+        "neo-soul R&B, live electric guitar licks, soft groove, sensual atmosphere",
+        "dark R&B, minor key piano, deep bass pulse, moody emotional tension",
+        "contemporary R&B, lush pad harmonies, airy hi-hats, polished modern feel",
+        "soulful R&B, gospel-influenced chord progressions, warm vintage keys, heartfelt",
+    ],
+    "afrobeats": [
+        "vibrant afrobeats, talking drum rhythms, bright guitar melody, joyful West African groove",
+        "afrobeats banger, layered percussion, catchy synth hook, infectious energy",
+        "amapiano-influenced afrobeats, log drum bass, hypnotic groove, South African sound",
+        "afro fusion, kora-inspired melody, rich polyrhythmic percussion, warm organic feel",
+    ],
+    "dancehall": [
+        "riddim dancehall, deep digital bass, offbeat guitar skank, Caribbean energy",
+        "modern dancehall, trap-influenced rhythm, melodic synth hook, danceable groove",
+        "lovers rock dancehall, smooth reggae feel, warm bass, romantic Caribbean vibe",
+    ],
+    "lo-fi": [
+        "lo-fi hip hop, dusty vinyl crackle, mellow Rhodes melody, soft brushed drums, late night studying",
+        "rainy day lo-fi, warm tape saturation, sleepy piano chords, soft kick, nostalgic haze",
+        "jazzy lo-fi, muted guitar chords, vinyl grain texture, cozy introspective atmosphere",
+        "lo-fi soul, gentle upright bass, warm Rhodes, dusty snare, slow meditative groove",
+        "lo-fi chill, softly pitched vocal chop, mellow analog warmth, drifting daydream feel",
+    ],
+    "electronic": [
+        "cutting-edge electronic, layered synthesizer arpeggios, driving pulse, modern production",
+        "experimental electronic, textured modular synth, evolving pads, futuristic atmosphere",
+        "dark electronic, cold industrial synth, hypnotic rhythm, underground club sound",
+        "melodic electronic, emotional synth lead, arpeggiated chords, euphoric atmosphere",
+    ],
+    "house": [
+        "classic Chicago house, soulful piano chords, four-on-the-floor kick, warm analog groove",
+        "funky house, chopped vocal stab, deep bass line, lively dancefloor energy",
+        "melodic house, emotional piano progression, lush pads, euphoric four-on-the-floor",
+        "afro house, tribal percussion layers, hypnotic groove, spiritual dancefloor energy",
+    ],
+    "deep house": [
+        "deep house, warm sub bass, atmospheric pads, introspective late-night groove",
+        "soulful deep house, dusty organ chords, rolling deep bass, intimate dancefloor feel",
+        "minimal deep house, sparse hypnotic groove, deep resonant bass, dark underground mood",
+        "vocal deep house, emotional chord progression, lush reverb, late night warmth",
+    ],
+    "tech house": [
+        "driving tech house, hypnotic bassline, punchy percussion, dark underground groove",
+        "funky tech house, filtered bass stab, syncopated rhythm, peak-hour energy",
+        "industrial tech house, distorted percussion, heavy kick, raw club energy",
+    ],
+    "techno": [
+        "dark Berlin techno, industrial kick drum, repetitive hypnotic rhythm, cold mechanical feel",
+        "hard techno, aggressive distorted kick, relentless hi-hats, dystopian atmosphere",
+        "melodic techno, emotional synth lead over industrial rhythm, hypnotic cathartic energy",
+        "minimal techno, stripped-back groove, deep resonant kick, hypnotic trance-like state",
+    ],
+    "edm": [
+        "festival EDM, massive synth lead, epic build-up and euphoric drop, crowd energy",
+        "progressive EDM, emotional chord progression, soaring synth lead, euphoric breakdown",
+        "electro EDM, retro-futuristic synth, punchy four-on-the-floor, high-energy peak",
+    ],
+    "dubstep": [
+        "heavy dubstep, massive wobble bass, half-time drum break, distorted drop energy",
+        "melodic dubstep, emotional synth lead, orchestral strings, cinematic drop",
+        "dark dubstep, industrial bass growl, cinematic tension build, devastating drop",
+    ],
+    "drum and bass": [
+        "liquid drum and bass, soulful Rhodes melody, fast rolling breaks, smooth atmospheric feel",
+        "dark drum and bass, ominous bass wobble, frantic amen break, underground tension",
+        "neurofunk drum and bass, complex bass modulation, technical percussion, futuristic feel",
+        "jump up drum and bass, heavyweight bass stab, energetic breakbeat, crowd-moving energy",
+    ],
+    "dnb": [
+        "liquid DnB, warm atmospheric pads, rolling sub bass, soulful melodic feel",
+        "dark DnB, aggressive bass, rapid amen break, underground raw energy",
+        "neurofunk DnB, clinical bass design, technical rhythms, cold futuristic atmosphere",
+    ],
+    "jungle": [
+        "classic jungle, chopped amen break, reggae bass wobble, raw 90s underground energy",
+        "dark jungle, ominous bass line, frantic percussion, intense rhythmic complexity",
+    ],
+    "reggaeton": [
+        "Latin reggaeton, punchy dembow rhythm, bright synth melody, urban Caribbean groove",
+        "dark reggaeton, minor key dembow, moody synth, street urban Latin energy",
+        "romantic reggaeton, smooth melody, warm production, sensual Latin groove",
+    ],
+    "latin": [
+        "vibrant Latin beat, layered percussion, bright brass stabs, festive rhythmic energy",
+        "Latin jazz fusion, complex piano chords, congas and timbales, rich harmonic groove",
+        "dark Latin, minor key guitar, moody atmosphere, intense rhythmic tension",
+    ],
+    "jazz": [
+        "late-night jazz, smoky walking bass, complex chord voicings, brushed snare, intimate atmosphere",
+        "jazz fusion, electric piano, intricate rhythmic interplay, improvisational energy",
+        "dark jazz, dissonant chords, sparse minor melody, noir cinematic atmosphere",
+        "upbeat jazz, swinging brass section, lively groove, classic bebop energy",
+    ],
+    "soul": [
+        "deep soul, warm organ chords, gospel-influenced melody, heartfelt emotional expression",
+        "classic soul, lush string arrangement, punchy Motown groove, timeless emotional depth",
+        "neo-soul, complex jazz chords, live bass pocket, introspective warm atmosphere",
+        "southern soul, raw emotional delivery, gritty guitar licks, deep groove",
+    ],
+    "funk": [
+        "classic funk, slapped bass groove, wah guitar, tight syncopated rhythm, James Brown influence",
+        "jazz funk, complex chord progression, electric piano, deep pocket groove, sophisticated",
+        "dark funk, minor key groove, heavy bass line, tense rhythmic interplay",
+        "P-funk inspired, spacey synth over heavy groove, layered percussion, cosmic feel",
+    ],
+    "pop": [
+        "polished pop, catchy piano hook, punchy modern production, hook-driven radio sound",
+        "dark pop, minor key emotional melody, lush production, introspective depth",
+        "indie pop, organic instrumentation, warm melody, bittersweet emotional atmosphere",
+        "electropop, bright synth melody, contemporary production, energetic catchy sound",
+    ],
+    "cinematic": [
+        "epic cinematic score, sweeping orchestral strings, dramatic percussion, powerful tension",
+        "dark cinematic, dissonant brass stabs, ominous cello, tense suspenseful atmosphere",
+        "emotional cinematic, solo piano over lush strings, heartbreaking melodic theme",
+        "action cinematic, driving percussion, heroic brass, relentless forward momentum",
+        "ambient cinematic, evolving atmospheric pads, sparse piano motif, vast spacious sound",
+    ],
+    "ambient": [
+        "deep ambient, slowly evolving pad layers, minimal texture, vast spacious dreamscape",
+        "dark ambient, ominous drone, unsettling atmospheric tension, cinematic darkness",
+        "ambient electronic, crystalline synth arpeggios, peaceful floating atmosphere",
+        "nature-inspired ambient, organic field recording texture, gentle melodic motif, serene",
+    ],
+    "phonk": [
+        "dark Memphis phonk, distorted 808, chopped soul vocal, cowbell, vintage cassette texture",
+        "aggressive phonk, heavy distorted kick, dark chord sample, raw underground energy",
+        "drift phonk, dark synth atmosphere, hard 808, high-energy intense momentum",
+        "melodic phonk, haunting vocal chop, distorted bass, eerie dark production",
+    ],
+    "cloud rap": [
+        "hazy cloud rap, washed-out ambient trap, atmospheric reverb-drenched melody, ethereal feel",
+        "dark cloud rap, ominous pad texture, distant pitched vocal, cold atmospheric trap",
+        "melodic cloud rap, emotional piano under heavy reverb, dreamy introspective atmosphere",
+    ],
+    "grime": [
+        "raw UK grime, staccato synth stabs, rolling 8-bar beat, aggressive dark energy",
+        "dark grime, minor key synth riff, sparse industrial rhythm, cold London sound",
+        "melodic grime, emotional keyboard lead, driving percussion, intense urban energy",
+    ],
+    "uk garage": [
+        "UK garage, shuffled 2-step beat, pitched vocal chop, warm bass, soulful house influence",
+        "speed garage, deep sub bass, skippy hi-hat rhythm, late-night underground groove",
+        "dark UK garage, minor key synth, shuffled rhythm, moody introspective atmosphere",
+    ],
+    "synthwave": [
+        "retro synthwave, pulsing analog bass, neon-lit arpeggios, 80s cinematic atmosphere",
+        "dark synthwave, cold minor key synth, dystopian Blade Runner atmosphere, driving rhythm",
+        "melodic synthwave, emotional lead synth, lush reverb, romantic 80s nostalgia",
+        "outrun synthwave, powerful bass pulse, heroic lead melody, action-movie energy",
+    ],
+    "vaporwave": [
+        "vaporwave, slowed pitched-down melody, lush reverb wash, nostalgic 80s corporate dream",
+        "dark vaporwave, unsettling slowed sample, dreamlike distortion, lonely atmosphere",
+        "mallsoft vaporwave, ambient elevator music deconstructed, surreal nostalgic texture",
+    ],
+    "hyperpop": [
+        "hyperpop, glitchy distorted synth, maximalist layered production, chaotic energy",
+        "dark hyperpop, heavy distorted 808, pitched vocal glitch, intense contrast",
+        "melodic hyperpop, emotional lead over glitchy production, bittersweet energy",
+    ],
+    "pluggnb": [
+        "dark pluggnb, smooth minor key melody, melodic trap groove, emotional introspective feel",
+        "pluggnb, lush pad chords, slow dark 808, hazy romantic atmosphere",
+        "melodic pluggnb, warm piano over slow trap rhythm, intimate emotional depth",
+    ],
+    "jersey club": [
+        "jersey club, frantic 4x4 kick, chopped vocal sample, high-energy dancefloor groove",
+        "dark jersey club, ominous bass stab, intense percussion, underground club energy",
+    ],
+    "reggae": [
+        "classic reggae, offbeat guitar skank, one-drop rhythm, warm bass, roots vibration",
+        "dub reggae, heavy bass, echo-soaked delay, sparse drumming, hypnotic trippy feel",
+        "dancehall reggae, digital riddim, modern production, Caribbean energy",
+    ],
+    "gospel": [
+        "powerful gospel, full choir harmony, driving rhythm, uplifting spiritual energy",
+        "contemporary gospel, modern production, emotional piano, soulful choir texture",
+        "dark gospel, minor key spiritual tension, raw emotional power, building drama",
+    ],
+    "blues": [
+        "delta blues, raw electric guitar riff, gritty 12-bar progression, soulful expression",
+        "modern blues, emotional lead guitar, deep groove, heartfelt authentic feel",
+        "blues jazz fusion, complex chord progression, expressive guitar, sophisticated groove",
+    ],
+    "rock": [
+        "hard rock, driving electric guitar riff, powerful live drums, raw energy",
+        "indie rock, warm guitar tone, melodic hook, authentic organic sound",
+        "dark rock, heavy distorted guitar, minor key tension, intense brooding atmosphere",
+    ],
+    "rap": [
+        "hard rap beat, punchy drums, dark sample, street energy, raw production",
+        "melodic rap, emotional piano loop, deep bass, introspective atmosphere",
+    ],
 }
 
-MOOD_MAP = {
-    "dark":       "dark minor key, ominous tense atmosphere, menacing brooding",
-    "sad":        "melancholic sad melody, minor key emotion, heartbreaking",
-    "emotional":  "deeply emotional, heartfelt raw atmosphere, touching",
-    "energetic":  "high energy driving intensity, powerful momentum, adrenaline",
-    "chill":      "chill relaxed laid-back vibe, mellow smooth, easygoing",
-    "aggressive": "aggressive hard-hitting intense, powerful in-your-face, raw force",
-    "uplifting":  "uplifting positive bright energy, major key hopeful, inspirational",
-    "mysterious": "mysterious eerie haunting, suspenseful tension, cinematic dark",
-    "romantic":   "romantic warm smooth, sensual soulful expression, intimate",
-    "hard":       "hard-hitting heavy punchy, thick powerful bass, aggressive drums",
-    "melodic":    "melodic expressive lead, rich harmonic depth, strong hooks",
-    "happy":      "happy bright cheerful major key, feel-good positive, joyful",
-    "angry":      "angry aggressive intense, distorted heavy energy, raw power",
-    "nostalgic":  "nostalgic warm retro, vintage analog texture, timeless",
-    "epic":       "epic cinematic power, massive orchestral build, dramatic",
-    "dreamy":     "dreamy ethereal floating, hazy reverb-soaked texture, hypnotic",
-    "bouncy":     "bouncy playful groove, catchy rhythmic, fun energetic swing",
-    "raw":        "raw unpolished gritty energy, underground authentic, street sound",
+# Rich mood descriptions — multiple variants per mood, one picked randomly
+MOOD_VARIANTS = {
+    "dark": [
+        "dark ominous minor key, menacing brooding tension, cold threatening atmosphere",
+        "pitch-black darkness, slow-burning dread, unsettling harmonic dissonance",
+        "deeply dark production, haunting minor chords, shadowy oppressive atmosphere",
+        "noir darkness, tense cinematic atmosphere, cold emotionless menace",
+    ],
+    "sad": [
+        "heartbreaking melancholy, tearful minor key, deep emotional sorrow, bittersweet pain",
+        "devastating sadness, lonely atmosphere, raw emotional vulnerability, quiet grief",
+        "melancholic introspection, aching melody, soulful heartbreak, late-night loneliness",
+        "mournful sadness, weeping lead melody, slow emotional decay, poignant atmosphere",
+    ],
+    "emotional": [
+        "deeply emotional, raw vulnerability, heartfelt honest expression, moving atmosphere",
+        "overwhelming emotion, intense personal feeling, powerful inner journey",
+        "cathartic emotional release, deeply touching, resonant human connection",
+    ],
+    "energetic": [
+        "explosive high energy, adrenaline rush, relentless forward momentum, kinetic power",
+        "driving intense energy, unstoppable force, electrifying rhythm, powerful momentum",
+        "frenetic high-octane energy, fast and furious, heart-pounding intensity",
+    ],
+    "chill": [
+        "mellow laid-back groove, smooth relaxed atmosphere, easygoing Sunday afternoon feel",
+        "soft chill vibe, gentle floating melody, unhurried peaceful mood, calm tranquility",
+        "warm chill atmosphere, hazy comfort, slow-breathing relaxation, soft and easy",
+    ],
+    "aggressive": [
+        "brutally aggressive, hard-hitting in-your-face, relentless raw force, confrontational",
+        "savage intensity, violent energy, crushing heavy production, overwhelming aggression",
+        "menacing aggression, cold calculated force, dominant threatening energy",
+    ],
+    "uplifting": [
+        "uplifting hopeful energy, soaring major key, inspiring triumph, bright optimism",
+        "euphoric uplift, joyful emotional release, spiritual elevation, warm radiant energy",
+        "motivating uplifting power, victorious momentum, hopeful bright atmosphere",
+    ],
+    "mysterious": [
+        "mysterious eerie tension, haunting unknown, suspenseful cinematic atmosphere",
+        "enigmatic dark mystery, unsettling curiosity, strange other-worldly feel",
+        "deep mysterious groove, hypnotic trance-like unknown, dark compelling atmosphere",
+    ],
+    "romantic": [
+        "intimate romantic warmth, sensual smooth groove, tender emotional closeness",
+        "passionate romance, deep feeling, lush warm atmosphere, heartfelt connection",
+        "late-night romantic mood, silky smooth production, soft emotional intimacy",
+    ],
+    "hard": [
+        "hard-hitting heavy production, thick punishing bass, aggressive powerful drums",
+        "heavy knocking, dense brutal sound, walls of bass, relentless hard energy",
+        "hard street sound, heavy low-end weight, tough uncompromising production",
+    ],
+    "melodic": [
+        "richly melodic, expressive lead instrument, deep harmonic layers, strong memorable hooks",
+        "beautiful melodic composition, emotional lead melody, lush harmonic depth",
+        "soulful melodic expression, singing lead line, rich emotional musical development",
+    ],
+    "happy": [
+        "joyful bright happiness, feel-good major key, playful cheerful energy, sunny positivity",
+        "carefree happy groove, light bouncy energy, warm smiling atmosphere, optimistic",
+        "celebratory happiness, bright upbeat mood, lively joyful production",
+    ],
+    "angry": [
+        "raw angry aggression, distorted heavy energy, explosive tension, furious intensity",
+        "boiling rage, crushing heavy production, dark violent energy, uncontrolled force",
+        "seething anger, tense grinding distortion, intense hostile atmosphere",
+    ],
+    "nostalgic": [
+        "warm nostalgic longing, vintage analog texture, bittersweet memory, timeless past",
+        "deep nostalgia, faded photograph sound, warm crackle and grain, lost time feeling",
+        "melancholic nostalgia, old memory resurfacing, warm vintage atmosphere, wistful longing",
+    ],
+    "epic": [
+        "massive epic scale, sweeping orchestral power, cinematic dramatic build, larger than life",
+        "towering epic grandeur, heroic tension, powerful build and release, overwhelming scale",
+        "epic cinematic intensity, dramatic momentum, colossal sound design, unforgettable impact",
+    ],
+    "dreamy": [
+        "ethereal dreamy float, hazy reverb-drenched atmosphere, hypnotic soft blur, sleep state",
+        "lush dreamy landscape, soft shimmering textures, weightless floating atmosphere",
+        "dreamy surreal warmth, blurred soft edges, hypnotic drifting meditation",
+    ],
+    "bouncy": [
+        "playful bouncy groove, catchy rhythmic energy, fun upbeat swing, head-bobbing momentum",
+        "lively bouncy feel, energetic playful rhythm, infectious catchy movement",
+    ],
+    "raw": [
+        "raw unpolished grit, underground authentic street energy, lo-fi dirty texture",
+        "crude raw production, unprocessed honest sound, underground rough authenticity",
+        "gritty street raw energy, imperfect human feel, honest unfiltered expression",
+    ],
 }
+
+# Random production texture tags added to every beat for variety
+_PRODUCTION_TEXTURES = {
+    "trap":          ["pitched vocal chop sample", "chopped soul loop", "granular pad texture",
+                      "warm tape saturation", "vinyl crackle underneath", "lush reverb tail on snare",
+                      "distant pad atmosphere", "orchestral string sample"],
+    "drill":         ["cold atmospheric pad", "eerie string stabs", "pitched vocal sample",
+                      "distant choir texture", "dark reverb-drenched atmosphere"],
+    "hip hop":       ["dusty vinyl sample", "warm analog compression", "muffled soul chop",
+                      "jazz piano sample", "horn stab", "vocal ad-lib chop"],
+    "boom bap":      ["vinyl crackle texture", "dusty soul sample", "jazz horn stab",
+                      "muffled guitar chop", "record scratch", "warm analog warmth"],
+    "r&b":           ["lush string arrangement", "warm Rhodes comping", "breathy vocal texture",
+                      "smooth guitar lick", "rich harmonic pads"],
+    "lo-fi":         ["vinyl record crackle", "tape wobble", "rain sounds in background",
+                      "warm tube saturation", "dusty filtered texture", "muffled distant feel"],
+    "house":         ["soulful vocal chop", "percussive shaker groove", "warm organ stab",
+                      "funky bass fill", "lush pad swell"],
+    "deep house":    ["jazzy chord stab", "breathy vocal texture", "warm sub bass pulse",
+                      "distant piano motif"],
+    "techno":        ["metallic percussion hit", "industrial noise texture", "filter sweep",
+                      "cold robotic atmosphere", "heavy reverb decay"],
+    "phonk":         ["Memphis vocal sample", "cowbell accent", "distorted cassette texture",
+                      "dark chord stab", "chopped rap vocal"],
+    "cloud rap":     ["pitched reversed vocal", "ambient pad wash", "dreamy melody fragment",
+                      "distant bell texture"],
+    "synthwave":     ["analog synth arpeggios", "gated reverb snare texture", "neon pad atmosphere",
+                      "chorus-drenched guitar", "lush stereo field"],
+    "cinematic":     ["solo cello motif", "French horn swell", "tension string tremolo",
+                      "timpani accent", "choir breath texture"],
+    "ambient":       ["field recording texture", "granular synthesis pad", "evolving drone layer",
+                      "shimmering overtone texture"],
+    "_default":      ["warm reverb atmosphere", "subtle pad layer", "textured background element",
+                      "rhythmic accent detail", "harmonic depth layer"],
+}
+
+# Atmospheric feel tags — added randomly to give ACE-Step creative direction
+_FEEL_TAGS = [
+    "late night 3am energy", "empty city streets", "rain on the window",
+    "introspective inner thoughts", "staring at the ceiling", "driving alone at night",
+    "neon lights and fog", "cold winter silence", "summer heat haze",
+    "headphone listening music", "bedroom studio intimacy", "underground club basement",
+    "rooftop sunset session", "cinematic storytelling", "raw emotional honesty",
+    "street corner atmosphere", "luxury late night", "spiritual transcendence",
+]
 
 # Melodic stem to extract per genre (ACE-Step extract instruction stem name)
 GENRE_MELODY_STEM = {
@@ -431,22 +741,116 @@ def _drum_hint(style: str, user_prompt: str, genre: str) -> str:
     return ", ".join(parts)
 
 
+# Harmonic color tags added randomly for chord variety
+_HARMONIC_COLORS = [
+    "minor 9th chord progression", "suspended 2nd and 4th chords",
+    "major 7th chord voicings", "diminished passing chords",
+    "dominant 7th chord resolution", "ii-V-I jazz movement",
+    "chromatic bass line motion", "borrowed chords from parallel minor",
+    "lydian mode bright sound", "phrygian dark modal feel",
+    "dorian mode soulful groove", "pentatonic scale melody",
+    "tritone substitution", "quartal harmony voicings",
+]
+
+# Specific instrument flavor descriptors — replaces generic "piano"/"synth" in prompt enrichment
+_INSTRUMENT_FLAVORS = {
+    "piano": [
+        "melancholic Fender Rhodes with tremolo", "dusty upright acoustic piano",
+        "warm vintage grand piano with room reverb", "soft intimate piano with pedal sustain",
+        "cold digital piano with crystal clarity", "prepared piano with muffled hammer sound",
+    ],
+    "synth": [
+        "warm analog Moog synth lead", "cold digital wavetable synthesizer",
+        "bright JP-8 supersaw synth pad", "dark resonant filter sweep synth",
+        "vintage Prophet-5 polysynth chords", "lush Juno chorus synth pad",
+        "aggressive modular synth sequence", "glassy FM synthesis tones",
+    ],
+    "guitar": [
+        "clean Stratocaster guitar with reverb", "warm hollow-body jazz guitar",
+        "distorted electric guitar with chorus", "fingerpicked acoustic guitar",
+        "wah-pedal funk guitar lick", "slide guitar with heavy reverb",
+    ],
+    "strings": [
+        "lush orchestral string section with vibrato", "solo cello with intimate room reverb",
+        "tremolo string ensemble", "pizzicato string accents",
+        "string quartet with close microphone warmth",
+    ],
+    "bass": [
+        "deep 808 sub bass with slow attack", "slapped Fender bass with punch",
+        "warm upright double bass", "filtered acid bass with resonance",
+        "distorted bass with overdrive grit", "smooth fretless bass slide",
+    ],
+    "keyboard": [
+        "warm Wurlitzer electric piano", "vintage Hammond organ with rotary speaker",
+        "clean Rhodes electric piano with chorus", "bright clavinet with wah filter",
+    ],
+}
+
+# Production technique tags for realism and depth
+_PRODUCTION_TECHNIQUES = [
+    "sidechain compression pumping pads",
+    "lush plate reverb tail on the snare",
+    "tape saturation warmth on the mix",
+    "lo-fi vinyl grain and tape hiss texture",
+    "heavy room reverb on the drums",
+    "stereo widening on the pads",
+    "subtle pitch variation for human feel",
+    "layered harmonic overtones",
+    "punchy parallel compression on kick",
+    "soft limiting for analog warmth",
+    "delay throws on the melody",
+    "filtered low-pass sweep on the pad",
+    "transient shaping on the snare",
+]
+
+
 def build_tags(prompt: str, genre: str, mood: str, bpm: int, key: str) -> str:
+    g = genre.lower().strip() if genre else ""
+    m = mood.lower().strip() if mood else ""
+
     parts = []
-    genre_base = GENRE_BASES.get(genre.lower() if genre else "", f"{genre}" if genre else "")
-    if genre_base:
-        parts.append(genre_base)
-    mood_desc = MOOD_MAP.get(mood.lower() if mood else "", mood if mood else "")
-    if mood_desc:
-        parts.append(mood_desc)
+
+    # Genre: pick random variant for variety
+    genre_variants = GENRE_VARIANTS.get(g)
+    if genre_variants:
+        parts.append(random.choice(genre_variants))
+    elif g:
+        parts.append(g)
+
+    # Mood: pick random variant for variety
+    mood_variants = MOOD_VARIANTS.get(m)
+    if mood_variants:
+        parts.append(random.choice(mood_variants))
+    elif m:
+        parts.append(m)
+
+    # User prompt
     if prompt:
         parts.append(prompt)
+
+    # Atmospheric feel tag (1 random pick, 60% chance)
+    if random.random() < 0.60:
+        parts.append(random.choice(_FEEL_TAGS))
+
+    # Production texture specific to genre (1 random pick)
+    textures = _PRODUCTION_TEXTURES.get(g, _PRODUCTION_TEXTURES["_default"])
+    parts.append(random.choice(textures))
+
+    # Random production technique (1 pick)
+    parts.append(random.choice(_PRODUCTION_TECHNIQUES))
+
+    # Harmonic color (40% chance — not every beat needs explicit harmony direction)
+    if random.random() < 0.40:
+        parts.append(random.choice(_HARMONIC_COLORS))
+
+    # Fixed quality markers
     parts.append("instrumental, no vocals, no singing, no spoken words")
     if bpm:
         parts.append(f"{bpm} BPM")
     if key:
         parts.append(f"key of {key}")
-    parts.append("professional studio quality, clean mix, well-produced beat")
+    parts.append("professional studio production, rich mix depth, emotionally expressive")
+
     # Deduplicate preserving order
     seen, out = set(), []
     for p in parts:
