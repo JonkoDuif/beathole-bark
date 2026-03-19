@@ -95,7 +95,7 @@ def get_handlers():
     # ACE-Step 1.5 initialisation
     if hasattr(_dit_handler, "initialize_service"):
         _dit_handler.initialize_service(
-            checkpoint_dir=checkpoint_dir,
+            project_root=checkpoint_dir,
             config_path="acestep-v15-base",
             device=device,
         )
