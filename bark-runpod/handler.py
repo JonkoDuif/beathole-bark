@@ -48,8 +48,9 @@ except Exception as e:
 SAMPLE_RATE = 48000   # ACE-Step native output sample rate
 STEM_SR     = 22050   # stem upload sample rate — good quality, manageable size
 
-_dit_handler = None
-_llm_handler = None
+_dit_handler       = None   # turbo — text2music generation
+_dit_base_handler  = None   # base  — extract task (turbo does NOT support extract)
+_llm_handler       = None
 
 def _patch_low_cpu_mem():
     """
@@ -104,9 +105,9 @@ def get_handlers():
     first run. Set ACESTEP_PROJECT_ROOT in the environment (Dockerfile) so
     files persist at a known location across pod restarts.
     """
-    global _dit_handler, _llm_handler
+    global _dit_handler, _dit_base_handler, _llm_handler
     if _dit_handler is not None:
-        return _dit_handler, _llm_handler
+        return _dit_handler, _dit_base_handler, _llm_handler
 
     project_root = os.environ.get("ACESTEP_PROJECT_ROOT", "/app")
     device       = "cuda" if torch.cuda.is_available() else "cpu"
@@ -114,68 +115,59 @@ def get_handlers():
 
     print(f"[acestep] Loading handlers (device={device}, project_root={project_root})...", flush=True)
 
-    _dit_handler = _DitHandlerClass()
-    _llm_handler = _LLMHandlerClass()
+    orig_fp = _patch_low_cpu_mem()
 
-    if hasattr(_dit_handler, "initialize_service"):
-        # Patch from_pretrained so meta tensors are never created during DiT init.
-        orig_fp = _patch_low_cpu_mem()
-
-        # ACE-Step/Ace-Step1.5 on HuggingFace is the turbo model.
-        # Try turbo first, fall back to base.
-        for config_name in ["acestep-v15-turbo", "acestep-v15-base"]:
-            print(f"[acestep] initialize_service(project_root={project_root}, config_path={config_name}, device={device})", flush=True)
-            try:
-                _dit_handler.initialize_service(
-                    project_root=project_root,
-                    config_path=config_name,
-                    device=device,
-                )
-            except Exception as e:
-                print(f"[acestep] initialize_service raised: {e}", flush=True)
-
-            # initialize_service swallows internal errors; check if model loaded.
-            if getattr(_dit_handler, "model", None) is not None:
-                print(f"[acestep] DIT model loaded OK (config_path={config_name})", flush=True)
-                break
-            print(f"[acestep] DIT model is None after config_path={config_name}, trying next...", flush=True)
-            # Reset handler state for next attempt
-            _dit_handler.model = None
-        else:
-            _restore_pretrained(orig_fp)
-            raise RuntimeError(
-                "AceStepHandler: model is None after all config_path attempts. "
-                "Check logs above for the underlying error."
-            )
-
-        _restore_pretrained(orig_fp)
-
-        # Verify all required components are present
-        missing = [c for c in ("model", "vae", "text_encoder", "text_tokenizer")
-                   if getattr(_dit_handler, c, None) is None]
-        if missing:
-            raise RuntimeError(f"AceStepHandler missing components after init: {missing}")
-        print("[acestep] All DIT components loaded", flush=True)
-
-        # LLM is optional — generation works without it (no chain-of-thought)
-        lm_checkpoint_dir = os.path.join(project_root, "checkpoints")
+    def _init_dit(config_name: str):
+        """Init a fresh DitHandler with the given config. Returns handler or None."""
+        h = _DitHandlerClass()
+        if not hasattr(h, "initialize_service"):
+            return h  # ACE-Step 1.0 — no config_name concept
+        print(f"[acestep] initialize_service(config_path={config_name})...", flush=True)
         try:
-            _llm_handler.initialize(
-                checkpoint_dir=lm_checkpoint_dir,
-                lm_model_path=lm_model,
-                device=device,
-            )
-            print("[acestep] LLM handler initialized", flush=True)
-        except Exception as lm_err:
-            print(f"[acestep] LLM init failed (non-fatal): {lm_err}", flush=True)
-            _llm_handler = None
-    else:
-        # ACE-Step 1.0 fallback
-        _dit_handler = _DitHandlerClass(model_name="acestep-5Hz-dit-base")
-        _llm_handler = _LLMHandlerClass(model_name=lm_model)
+            h.initialize_service(project_root=project_root, config_path=config_name, device=device)
+        except Exception as e:
+            print(f"[acestep] initialize_service({config_name}) raised: {e}", flush=True)
+        if getattr(h, "model", None) is None:
+            print(f"[acestep] {config_name}: model is None after init", flush=True)
+            return None
+        missing = [c for c in ("model", "vae", "text_encoder", "text_tokenizer")
+                   if getattr(h, c, None) is None]
+        if missing:
+            print(f"[acestep] {config_name}: missing components {missing}", flush=True)
+            return None
+        print(f"[acestep] {config_name} handler ready", flush=True)
+        return h
 
-    print("[acestep] Handlers ready", flush=True)
-    return _dit_handler, _llm_handler
+    # ── Turbo model: text2music, cover, repaint (fastest) ─────────────────────
+    _dit_handler = _init_dit("acestep-v15-turbo")
+    if _dit_handler is None:
+        _dit_handler = _init_dit("acestep-v15-base")  # fallback
+    if _dit_handler is None:
+        _restore_pretrained(orig_fp)
+        raise RuntimeError("Could not initialize any ACE-Step DiT model")
+
+    # ── Base model: extract task (turbo does NOT support extract per docs) ─────
+    # Only load if turbo succeeded — they share VAE/text-encoder so VRAM cost
+    # is mostly just the DiT weights (~4 GB extra).
+    _dit_base_handler = _init_dit("acestep-v15-base")
+    if _dit_base_handler is None:
+        print("[acestep] Base model unavailable — extract will use turbo (may be lower quality)", flush=True)
+        _dit_base_handler = _dit_handler  # graceful fallback
+
+    _restore_pretrained(orig_fp)
+
+    # ── LLM (optional — enables chain-of-thought captioning) ──────────────────
+    _llm_handler = _LLMHandlerClass()
+    lm_checkpoint_dir = os.path.join(project_root, "checkpoints")
+    try:
+        _llm_handler.initialize(checkpoint_dir=lm_checkpoint_dir, lm_model_path=lm_model, device=device)
+        print("[acestep] LLM handler initialized", flush=True)
+    except Exception as lm_err:
+        print(f"[acestep] LLM init failed (non-fatal): {lm_err}", flush=True)
+        _llm_handler = None
+
+    print("[acestep] All handlers ready", flush=True)
+    return _dit_handler, _dit_base_handler, _llm_handler
 
 
 # ── Utility: audio → WAV base64 ───────────────────────────────────────────────
@@ -674,7 +666,7 @@ def generate_audio_with_stems(job_input: dict) -> dict:
        ACE-Step's extract task — stems always match the beat 100%.
     3. Upload stems to backend. Return combined beat WAV + stem URLs.
     """
-    dit, llm = get_handlers()
+    dit, dit_base, llm = get_handlers()
 
     user_prompt = job_input.get("prompt", "").strip()
     _dur_raw    = job_input.get("duration")
@@ -767,7 +759,8 @@ def generate_audio_with_stems(job_input: dict) -> dict:
                 instruction = f"Extract the {track_name} track from the audio:",
                 thinking    = False,
             )
-            stem_path  = _ace_generate(dit, llm, ext_params, f"/tmp/bh_stem_{ace_stem}.wav")
+            # Extract uses the base model (turbo does not support extract task)
+            stem_path  = _ace_generate(dit_base, llm, ext_params, f"/tmp/bh_stem_{ace_stem}.wav")
             stem_audio = _read_audio(stem_path)
             stems_audio[ace_stem] = (stem_audio, display_name)
             print(f"[stems] '{ace_stem}' extracted — shape: {stem_audio.shape}", flush=True)
@@ -816,7 +809,7 @@ def generate_audio_with_stems(job_input: dict) -> dict:
 
 def generate_preview_audio(job_input: dict) -> tuple:
     """Short 60s preview for MIDI mode beat page. Returns (wav_base64, duration_sec)."""
-    dit, llm = get_handlers()
+    dit, dit_base, llm = get_handlers()
 
     genre  = job_input.get("genre",  "").strip().lower()
     mood   = job_input.get("mood",   "").strip().lower()
