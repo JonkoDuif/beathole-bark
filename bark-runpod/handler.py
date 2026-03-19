@@ -309,58 +309,69 @@ GENRE_VARIANTS = {
         "lo-fi chill, softly pitched vocal chop, mellow analog warmth, drifting daydream feel",
     ],
     "electronic": [
-        "cutting-edge electronic, layered synthesizer arpeggios, driving pulse, modern production",
-        "experimental electronic, textured modular synth, evolving pads, futuristic atmosphere",
-        "dark electronic, cold industrial synth, hypnotic rhythm, underground club sound",
-        "melodic electronic, emotional synth lead, arpeggiated chords, euphoric atmosphere",
+        "cutting-edge electronic, layered synthesizer arpeggios, explosive driving pulse, massive synth stabs, modern high-energy production",
+        "experimental electronic, textured modular synth, evolving complex pads, intense futuristic atmosphere, relentless forward motion",
+        "dark electronic, cold industrial synth, hypnotic relentless rhythm, heavy bass punch, underground club power",
+        "melodic electronic, soaring emotional synth lead, arpeggiated chords building to euphoric peak, lush atmospheric depth",
+        "hard electronic, brutal percussion hits, distorted bass pressure, intense aggressive energy, raw club force",
     ],
     "house": [
-        "classic Chicago house, soulful piano chords, four-on-the-floor kick, warm analog groove",
-        "funky house, chopped vocal stab, deep bass line, lively dancefloor energy",
-        "melodic house, emotional piano progression, lush pads, euphoric four-on-the-floor",
-        "afro house, tribal percussion layers, hypnotic groove, spiritual dancefloor energy",
+        "classic Chicago house, stomping four-on-the-floor kick, punchy soulful piano chords, warm analog bassline, peak-hour dancefloor energy",
+        "funky house, driving chopped vocal stab, thick deep bass line, lively relentless dancefloor energy, full arrangement",
+        "melodic house, euphoric emotional piano progression, soaring lush pads, powerful four-on-the-floor drive, crowd-lifting energy",
+        "afro house, hypnotic tribal percussion layers, heavy groove, driving bassline, spiritual high-energy dancefloor power",
+        "peak-hour house, aggressive bass stab, relentless kick drive, intense club energy, full powerful production",
     ],
     "deep house": [
-        "deep house, warm sub bass, atmospheric pads, introspective late-night groove",
-        "soulful deep house, dusty organ chords, rolling deep bass, intimate dancefloor feel",
-        "minimal deep house, sparse hypnotic groove, deep resonant bass, dark underground mood",
-        "vocal deep house, emotional chord progression, lush reverb, late night warmth",
+        "deep house, powerful warm sub bass, rich atmospheric pads, deep introspective late-night groove, full mix depth",
+        "soulful deep house, dusty organ chords, rolling punchy deep bass, emotional intimate dancefloor energy",
+        "minimal deep house, hypnotic groove, deep resonant bass thump, dark underground tension, hypnotic forward drive",
+        "vocal deep house, emotional chord progression, lush reverb depth, late night full-bodied warmth",
     ],
     "tech house": [
-        "driving tech house, hypnotic bassline, punchy percussion, dark underground groove",
-        "funky tech house, filtered bass stab, syncopated rhythm, peak-hour energy",
-        "industrial tech house, distorted percussion, heavy kick, raw club energy",
+        "driving tech house, menacing hypnotic bassline, heavy punchy percussion, dark relentless underground groove, peak-hour intensity",
+        "funky tech house, thick filtered bass stab, syncopated rhythm, high-energy peak-hour power, full arrangement",
+        "industrial tech house, crushing distorted percussion, heavy driving kick, raw club energy, intense mechanical force",
+        "hard tech house, aggressive bass pressure, relentless groove, dystopian underground energy, full powerful production",
     ],
     "techno": [
-        "dark Berlin techno, industrial kick drum, repetitive hypnotic rhythm, cold mechanical feel",
-        "hard techno, aggressive distorted kick, relentless hi-hats, dystopian atmosphere",
-        "melodic techno, emotional synth lead over industrial rhythm, hypnotic cathartic energy",
-        "minimal techno, stripped-back groove, deep resonant kick, hypnotic trance-like state",
+        "dark Berlin techno, crushing industrial kick drum, relentless hypnotic rhythm, cold mechanical energy, intense driving force",
+        "hard techno, aggressive distorted kick, relentless hi-hats, dystopian atmosphere, brutal driving intensity, full power",
+        "melodic techno, soaring emotional synth lead over relentless industrial rhythm, building cathartic peak-hour energy",
+        "minimal techno, hypnotic deep resonant kick, relentless groove, rising tension, dark powerful underground drive",
+        "peak techno, massive kick pressure, sweeping filter automation, relentless forward momentum, crowd-peak energy",
     ],
     "edm": [
-        "festival EDM, massive synth lead, epic build-up and euphoric drop, crowd energy",
-        "progressive EDM, emotional chord progression, soaring synth lead, euphoric breakdown",
-        "electro EDM, retro-futuristic synth, punchy four-on-the-floor, high-energy peak",
+        "festival EDM, massive soaring synth lead, explosive epic build-up, euphoric drop with crowd energy, full stadium production",
+        "progressive EDM, emotional chord progression, huge soaring synth lead, euphoric breakdown into massive drop",
+        "electro EDM, retro-futuristic synth stab, punchy four-on-the-floor, high-energy peak-hour intensity, full energetic production",
+        "big room EDM, crushing kick drop, huge chord stabs, massive build tension release, overwhelming crowd energy",
+        "electro house EDM, punchy distorted bass, relentless driving kick, explosive drop energy, high-intensity production",
     ],
     "dubstep": [
-        "heavy dubstep, massive wobble bass, half-time drum break, distorted drop energy",
-        "melodic dubstep, emotional synth lead, orchestral strings, cinematic drop",
-        "dark dubstep, industrial bass growl, cinematic tension build, devastating drop",
+        "heavy riddim dubstep, crushing reese bass wobble, half-time 140 BPM kick, devastating sub-bass drop, filthy modulated bass growl",
+        "brostep dubstep, massive distorted growl bass, raging aggressive percussion, face-melting drop intensity, full-frequency destruction",
+        "melodic dubstep, soaring emotional synth lead, cinematic orchestral build, explosive huge drop with cathartic energy release",
+        "dark dubstep, ominous cinematic tension build, industrial bass growl, bone-crushing drop, dystopian overwhelming energy",
+        "neuro dubstep, complex bass sound design, technical rhythmic precision, intense mechanical energy, deep sub pressure",
+        "future bass dubstep, lush chord swells building to heavy drop, emotional intensity, rich harmonic bass design",
     ],
     "drum and bass": [
-        "liquid drum and bass, soulful Rhodes melody, fast rolling breaks, smooth atmospheric feel",
-        "dark drum and bass, ominous bass wobble, frantic amen break, underground tension",
-        "neurofunk drum and bass, complex bass modulation, technical percussion, futuristic feel",
-        "jump up drum and bass, heavyweight bass stab, energetic breakbeat, crowd-moving energy",
+        "liquid drum and bass, soulful Rhodes melody, fast rolling 170 BPM breaks, smooth energetic atmospheric feel, full production",
+        "dark drum and bass, ominous aggressive bass wobble, frantic amen break, intense underground energy, relentless forward drive",
+        "neurofunk drum and bass, complex technical bass modulation, precision percussion, futuristic intense mechanical energy",
+        "jump up drum and bass, heavyweight punchy bass stab, energetic breakbeat, crowd-moving high-intensity energy",
+        "hard drum and bass, crushing bass pressure, relentless fast break, intense raw underground power, full energy",
     ],
     "dnb": [
-        "liquid DnB, warm atmospheric pads, rolling sub bass, soulful melodic feel",
-        "dark DnB, aggressive bass, rapid amen break, underground raw energy",
-        "neurofunk DnB, clinical bass design, technical rhythms, cold futuristic atmosphere",
+        "liquid DnB, warm atmospheric pads, rolling fast sub bass, soulful melodic forward momentum, full energetic feel",
+        "dark DnB, aggressive bass pressure, rapid amen break, relentless underground raw energy, intense driving force",
+        "neurofunk DnB, clinical bass design, technical rhythms, cold futuristic atmosphere, complex intense production",
+        "jump up DnB, heavy punchy bass, energetic crowd-moving breakbeat, high-intensity dancefloor power",
     ],
     "jungle": [
-        "classic jungle, chopped amen break, reggae bass wobble, raw 90s underground energy",
-        "dark jungle, ominous bass line, frantic percussion, intense rhythmic complexity",
+        "classic jungle, chopped amen break, reggae bass wobble, raw 90s underground energy, frantic rhythmic intensity",
+        "dark jungle, ominous bass line, frantic percussion complexity, intense rhythmic drive, powerful underground energy",
     ],
     "reggaeton": [
         "Latin reggaeton, punchy dembow rhythm, bright synth melody, urban Caribbean groove",
@@ -621,6 +632,107 @@ _FEEL_TAGS = [
     "street corner atmosphere", "luxury late night", "spiritual transcendence",
 ]
 
+# High-energy electronic genres — use electronic section labels + higher guidance
+_ELECTRONIC_GENRES = {
+    "dubstep", "drum and bass", "dnb", "jungle", "techno", "tech house",
+    "edm", "electronic", "house", "deep house", "hyperpop", "jersey club",
+    "grime", "uk garage",
+}
+
+# Per-genre energy descriptors — one picked randomly and injected into the prompt
+_GENRE_ENERGY_TAGS = {
+    "dubstep":       ["massive sub-bass pressure", "face-melting bass modulation", "crushing drop energy",
+                      "filthy wobble bass", "half-time drum break fury", "reese bass destruction"],
+    "drum and bass": ["170 BPM relentless energy", "frantic rolling breaks", "sub-bass pressure and speed",
+                      "amen break intensity", "fast driving momentum"],
+    "dnb":           ["170 BPM relentless energy", "frantic rolling breaks", "sub-bass pressure and speed",
+                      "amen break intensity", "fast driving momentum"],
+    "techno":        ["relentless driving force", "crushing kick pressure", "hypnotic dark intensity",
+                      "industrial mechanical energy", "peak-hour peak power"],
+    "tech house":    ["hypnotic bass-driven intensity", "relentless groove pressure", "dark peak-hour energy",
+                      "driving mechanical force"],
+    "edm":           ["euphoric crowd energy", "massive drop impact", "stadium-filling power",
+                      "epic build tension release", "soaring festival energy"],
+    "house":         ["four-on-the-floor driving power", "peak-hour dancefloor energy",
+                      "full arrangement layered intensity", "crowd-lifting groove force"],
+    "electronic":    ["full-spectrum energy", "layered modular intensity", "driving electronic force",
+                      "complex high-energy production"],
+    "hyperpop":      ["chaotic maximum energy", "distorted glitch intensity", "maximalist overwhelming sound"],
+    "trap":          ["rolling hi-hat intensity", "heavy sub-bass pressure", "dark atmospheric energy",
+                      "punchy 808 weight"],
+    "drill":         ["cold menacing energy", "dark aggressive intensity", "heavy slide 808 weight",
+                      "relentless hard drive"],
+    "hip hop":       ["head-nodding groove power", "punchy drum impact", "deep bass pocket",
+                      "soulful harmonic richness"],
+    "boom bap":      ["knocking drum power", "punchy sample chop", "deep groove momentum"],
+    "phonk":         ["dark distorted energy", "heavy 808 aggression", "Memphis raw power",
+                      "chopped soul intensity"],
+    "grime":         ["staccato aggressive energy", "cold UK intensity", "hard-hitting dark power"],
+    "rock":          ["driving guitar power", "explosive live energy", "wall of sound intensity"],
+    "metal":         ["crushing heavy intensity", "thunderous drum power", "aggressive riff energy"],
+}
+
+# Guidance scale range (min, max) per genre.
+# A random value is sampled each generation so beats stay varied.
+# Higher values = ACE-Step sticks tighter to the genre description / more energy.
+_GENRE_GUIDANCE_RANGE = {
+    # ── Electronic / club ──────────────────────────────────────────────────
+    "dubstep":       (9.0, 10.0),
+    "drum and bass": (8.5,  9.5),
+    "dnb":           (8.5,  9.5),
+    "jungle":        (8.5,  9.5),
+    "techno":        (8.5,  9.5),
+    "tech house":    (8.0,  9.0),
+    "edm":           (8.5,  9.5),
+    "house":         (7.5,  8.5),
+    "deep house":    (7.0,  8.0),
+    "electronic":    (8.0,  9.0),
+    "hyperpop":      (8.5,  9.5),
+    "jersey club":   (8.0,  9.0),
+    "uk garage":     (7.5,  8.5),
+    "grime":         (8.0,  9.0),
+    # ── Synthwave / retro ──────────────────────────────────────────────────
+    "synthwave":     (7.5,  8.5),
+    "vaporwave":     (6.5,  7.5),
+    # ── Hip-hop / rap ──────────────────────────────────────────────────────
+    "trap":          (7.5,  8.5),
+    "drill":         (7.5,  8.5),
+    "hip hop":       (7.0,  8.0),
+    "hip-hop":       (7.0,  8.0),
+    "rap":           (7.0,  8.0),
+    "boom bap":      (7.0,  8.0),
+    "phonk":         (7.5,  8.5),
+    "cloud rap":     (6.5,  7.5),
+    "pluggnb":       (6.5,  7.5),
+    # ── R&B / Soul / Funk ──────────────────────────────────────────────────
+    "r&b":           (7.0,  8.0),
+    "soul":          (7.0,  8.0),
+    "funk":          (7.5,  8.5),
+    "gospel":        (7.5,  8.5),
+    # ── Afro / Caribbean / Latin ───────────────────────────────────────────
+    "afrobeats":     (7.5,  8.5),
+    "dancehall":     (7.5,  8.5),
+    "reggaeton":     (7.5,  8.5),
+    "reggae":        (7.0,  8.0),
+    "latin":         (7.5,  8.5),
+    # ── Live instruments ───────────────────────────────────────────────────
+    "rock":          (8.0,  9.0),
+    "metal":         (8.5,  9.5),
+    "blues":         (7.0,  8.0),
+    "jazz":          (6.5,  7.5),
+    # ── Atmospheric / chill ────────────────────────────────────────────────
+    "lo-fi":         (6.0,  7.0),
+    "ambient":       (5.5,  6.5),
+    "cinematic":     (7.0,  8.0),
+    # ── Pop ────────────────────────────────────────────────────────────────
+    "pop":           (7.0,  8.0),
+}
+
+def _get_guidance_scale(genre: str) -> float:
+    """Return a randomly sampled guidance scale for the given genre."""
+    lo, hi = _GENRE_GUIDANCE_RANGE.get(genre, (7.0, 8.0))
+    return round(random.uniform(lo, hi), 2)
+
 # Melodic stem to extract per genre (ACE-Step extract instruction stem name)
 GENRE_MELODY_STEM = {
     "trap":          "synth",
@@ -830,6 +942,11 @@ def build_tags(prompt: str, genre: str, mood: str, bpm: int, key: str) -> str:
     elif g:
         parts.append(g)
 
+    # Genre-specific energy tag — always injected for energy-mapped genres
+    energy_tags = _GENRE_ENERGY_TAGS.get(g)
+    if energy_tags:
+        parts.append(random.choice(energy_tags))
+
     # Mood: pick random variant for variety
     mood_variants = MOOD_VARIANTS.get(m)
     if mood_variants:
@@ -862,7 +979,11 @@ def build_tags(prompt: str, genre: str, mood: str, bpm: int, key: str) -> str:
         parts.append(f"{bpm} BPM")
     if key:
         parts.append(f"key of {key}")
-    parts.append("professional studio production, rich mix depth, emotionally expressive")
+    # Energy/fullness qualifier — stronger for electronic genres
+    if g in _ELECTRONIC_GENRES:
+        parts.append("full energetic production, powerful mix, rich layered arrangement, high impact")
+    else:
+        parts.append("professional studio production, rich mix depth, emotionally expressive")
 
     # Deduplicate preserving order
     seen, out = set(), []
@@ -872,14 +993,20 @@ def build_tags(prompt: str, genre: str, mood: str, bpm: int, key: str) -> str:
     return ", ".join(out)
 
 
-def _build_lyrics_structure(duration: float, user_prompt: str = "") -> str:
+def _build_lyrics_structure(duration: float, user_prompt: str = "", genre: str = "") -> str:
     """
     Build a section structure for ACE-Step's arrangement dynamics.
 
     If the user mentions specific sections in the prompt (e.g. "2 verses 2 hooks
     with a bridge"), parse those and use them verbatim.  Otherwise pick a random
     structure that fits the duration so beats don't all follow the same pattern.
+
+    For electronic genres (dubstep, techno, EDM, DnB, etc.) we use genre-specific
+    section labels: [drop], [build], [breakdown] for more accurate energy dynamics.
     """
+    g = genre.lower().strip() if genre else ""
+    is_electronic = g in _ELECTRONIC_GENRES
+
     # ── Parse user-specified structure ──────────────────────────────────────
     p = user_prompt.lower()
 
@@ -895,8 +1022,11 @@ def _build_lyrics_structure(duration: float, user_prompt: str = "") -> str:
     n_bridge = _count(r'bridge')
     n_outro  = _count(r'outro')
     n_intro  = _count(r'intro')
+    # Electronic-specific keywords
+    n_drop   = _count(r'drop')
+    n_build  = _count(r'build')
 
-    has_explicit = any(x is not None for x in [n_verse, n_chorus, n_pre, n_bridge])
+    has_explicit = any(x is not None for x in [n_verse, n_chorus, n_pre, n_bridge, n_drop, n_build])
 
     if has_explicit:
         secs = []
@@ -916,7 +1046,44 @@ def _build_lyrics_structure(duration: float, user_prompt: str = "") -> str:
             secs.append("[outro]")
         return "\n[inst]\n".join(secs) + "\n[inst]"
 
-    # ── Random structure pool by duration ────────────────────────────────────
+    # ── Electronic genre section pools (drop/build/breakdown) ────────────────
+    # These section labels tell ACE-Step to create proper energy dynamics
+    if is_electronic:
+        if duration <= 90:
+            pool = [
+                ["[intro]", "[build]", "[drop]", "[outro]"],
+                ["[intro]", "[drop]", "[breakdown]", "[drop]"],
+                ["[build]", "[drop]", "[breakdown]", "[drop]"],
+            ]
+        elif duration <= 130:
+            pool = [
+                ["[intro]", "[build]", "[drop]", "[breakdown]", "[drop]", "[outro]"],
+                ["[intro]", "[drop]", "[breakdown]", "[build]", "[drop]", "[outro]"],
+                ["[intro]", "[build]", "[drop]", "[build]", "[drop]", "[outro]"],
+                ["[build]", "[drop]", "[breakdown]", "[drop]", "[breakdown]", "[outro]"],
+                ["[intro]", "[breakdown]", "[build]", "[drop]", "[drop]", "[outro]"],
+            ]
+        elif duration <= 180:
+            pool = [
+                ["[intro]", "[build]", "[drop]", "[breakdown]", "[build]", "[drop]", "[outro]"],
+                ["[intro]", "[drop]", "[breakdown]", "[build]", "[drop]", "[breakdown]", "[drop]", "[outro]"],
+                ["[intro]", "[build]", "[drop]", "[build]", "[drop]", "[breakdown]", "[outro]"],
+                ["[intro]", "[breakdown]", "[build]", "[drop]", "[drop]", "[breakdown]", "[drop]", "[outro]"],
+                ["[build]", "[drop]", "[breakdown]", "[build]", "[drop]", "[breakdown]", "[drop]", "[outro]"],
+                ["[intro]", "[build]", "[drop]", "[breakdown]", "[drop]", "[build]", "[drop]", "[outro]"],
+            ]
+        else:
+            pool = [
+                ["[intro]", "[build]", "[drop]", "[breakdown]", "[build]", "[drop]", "[breakdown]", "[drop]", "[outro]"],
+                ["[intro]", "[drop]", "[breakdown]", "[build]", "[drop]", "[breakdown]", "[build]", "[drop]", "[outro]"],
+                ["[intro]", "[build]", "[drop]", "[drop]", "[breakdown]", "[build]", "[drop]", "[breakdown]", "[outro]"],
+                ["[build]", "[drop]", "[breakdown]", "[build]", "[drop]", "[drop]", "[breakdown]", "[drop]", "[outro]"],
+                ["[intro]", "[build]", "[drop]", "[breakdown]", "[drop]", "[build]", "[drop]", "[outro]"],
+            ]
+        secs = random.choice(pool)
+        return "\n[inst]\n".join(secs) + "\n[inst]"
+
+    # ── Random structure pool by duration (non-electronic) ───────────────────
     # Each entry is a list of section tags; pick one randomly.
     if duration <= 90:
         pool = [
@@ -1389,11 +1556,12 @@ def generate_audio_with_stems(job_input: dict) -> dict:
     ref_strength   = float(job_input.get("referenceStrength") or 0.5)
 
     tags       = build_tags(user_prompt or style, genre, mood, bpm, key)
-    lyrics_str = _build_lyrics_structure(duration, user_prompt)
+    lyrics_str = _build_lyrics_structure(duration, user_prompt, genre)
     seed       = random.randint(0, 2**31 - 1)
+    g_scale    = _get_guidance_scale(genre)
 
     print(f"[gen] Tags: {tags}", flush=True)
-    print(f"[gen] Duration: {duration:.0f}s | BPM: {bpm} | Key: {key} | Seed: {seed}", flush=True)
+    print(f"[gen] Duration: {duration:.0f}s | BPM: {bpm} | Key: {key} | Seed: {seed} | guidance={g_scale}", flush=True)
 
     # Handle reference audio → temp file
     ref_path = None
@@ -1414,7 +1582,7 @@ def generate_audio_with_stems(job_input: dict) -> dict:
         keyscale        = key if key else "N/A",
         timesignature   = "4/4",
         inference_steps = infer_step,
-        guidance_scale  = 7.5,
+        guidance_scale  = g_scale,
         seed            = seed,
     )
     if ref_path:
@@ -2099,8 +2267,9 @@ def generate_midi_from_audio(job_input: dict) -> dict:
     duration = max(60.0, min(120.0, duration))
 
     tags       = build_tags(prompt, genre, mood, bpm, key)
-    lyrics_str = _build_lyrics_structure(duration, prompt)
+    lyrics_str = _build_lyrics_structure(duration, prompt, genre)
     seed       = random.randint(0, 2**31 - 1)
+    g_scale    = _get_guidance_scale(genre)
 
     # ── 1. Generate full beat ─────────────────────────────────────────────────
     print(f"[midi-gen] Generating {duration:.0f}s beat for transcription...", flush=True)
@@ -2113,7 +2282,7 @@ def generate_midi_from_audio(job_input: dict) -> dict:
         keyscale        = key if key else "N/A",
         timesignature   = "4/4",
         inference_steps = 20,
-        guidance_scale  = 7.5,
+        guidance_scale  = g_scale,
         seed            = seed,
     )
     full_beat_path = _ace_generate(dit, llm, full_params, "/tmp/bh_midi_main.wav")
