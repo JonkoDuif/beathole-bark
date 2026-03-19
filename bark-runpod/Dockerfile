@@ -3,8 +3,11 @@ FROM nvidia/cuda:12.8.0-cudnn-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
+# HF_HOME: HuggingFace cache (tokenizers, etc.)
 ENV HF_HOME=/app/models
-ENV ACESTEP_CHECKPOINT_DIR=/app/models/ace-step-v1.5
+# ACESTEP_PROJECT_ROOT: ACE-Step stores checkpoints under {root}/checkpoints/
+# initialize_service() downloads models here automatically on first run.
+ENV ACESTEP_PROJECT_ROOT=/app
 
 WORKDIR /app
 

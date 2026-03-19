@@ -51,57 +51,44 @@ STEM_SR     = 22050   # stem upload sample rate — good quality, manageable siz
 _dit_handler = None
 _llm_handler = None
 
-def _ensure_model_downloaded(checkpoint_dir):
-    """Download ACE-Step model weights at runtime if not already present."""
-    if not os.path.exists(os.path.join(checkpoint_dir, "config.json")):
-        hf_token = os.environ.get("HF_TOKEN", None)
-        # Allow override via env var; try known repo IDs in order
-        hf_repo = os.environ.get("ACESTEP_HF_REPO", "")
-        candidates = [r for r in [hf_repo, "ACE-Step/ACE-Step-v1.5-base", "ACE-Step/Ace-Step1.5", "ACE-Step/ACE-Step-v1.5"] if r]
-        print(f"[acestep] Model not found at {checkpoint_dir}, downloading from HuggingFace...", flush=True)
-        os.makedirs(checkpoint_dir, exist_ok=True)
-        from huggingface_hub import snapshot_download
-        last_err = None
-        for repo_id in candidates:
-            try:
-                print(f"[acestep] Trying repo: {repo_id}", flush=True)
-                snapshot_download(repo_id, local_dir=checkpoint_dir, token=hf_token)
-                print(f"[acestep] Model download complete from {repo_id}.", flush=True)
-                return
-            except Exception as e:
-                print(f"[acestep] Failed {repo_id}: {e}", flush=True)
-                last_err = e
-        raise RuntimeError(f"Could not download ACE-Step model from any known repo. Last error: {last_err}")
-    else:
-        print(f"[acestep] Model already present at {checkpoint_dir}", flush=True)
-
-
 def get_handlers():
+    """
+    Initialize AceStepHandler + LLMHandler.
+
+    ACE-Step 1.5 uses project_root to locate its checkpoints:
+      {project_root}/checkpoints/acestep-v15-turbo/   ← DiT model
+      {project_root}/checkpoints/vae/                  ← VAE
+      {project_root}/checkpoints/Qwen3-Embedding-0.6B/ ← text encoder
+
+    initialize_service() handles downloading these automatically from HuggingFace
+    if they are not already present. Set ACESTEP_PROJECT_ROOT in the environment
+    (Dockerfile) so the files persist in a predictable location.
+    """
     global _dit_handler, _llm_handler
     if _dit_handler is not None:
         return _dit_handler, _llm_handler
 
-    checkpoint_dir = os.environ.get("ACESTEP_CHECKPOINT_DIR", "/app/models/ace-step-v1.5")
-    device         = "cuda" if torch.cuda.is_available() else "cpu"
-    lm_model       = os.environ.get("ACESTEP_LM_MODEL", "acestep-5Hz-lm-0.6B")
+    # project_root: ACE-Step stores checkpoints under {project_root}/checkpoints/
+    # Default /app so files land in /app/checkpoints/ inside the container.
+    project_root = os.environ.get("ACESTEP_PROJECT_ROOT", "/app")
+    device       = "cuda" if torch.cuda.is_available() else "cpu"
+    lm_model     = os.environ.get("ACESTEP_LM_MODEL", "acestep-5Hz-lm-0.6B")
+    hf_token     = os.environ.get("HF_TOKEN", None)
 
-    _ensure_model_downloaded(checkpoint_dir)
-
-    print(f"[acestep] Loading handlers (device={device}, checkpoint_dir={checkpoint_dir})...", flush=True)
+    print(f"[acestep] Loading handlers (device={device}, project_root={project_root})...", flush=True)
 
     _dit_handler = _DitHandlerClass()
     _llm_handler = _LLMHandlerClass()
 
-    # ACE-Step 1.5 initialisation
     if hasattr(_dit_handler, "initialize_service"):
-        # Try turbo first (ACE-Step/Ace-Step1.5 on HF is the turbo model),
-        # fall back to base in case the user downloaded the base checkpoint.
+        # ACE-Step/Ace-Step1.5 on HuggingFace is the turbo model.
+        # Try turbo first, fall back to base if missing.
         init_ok = False
         for config_name in ["acestep-v15-turbo", "acestep-v15-base"]:
             try:
-                print(f"[acestep] initialize_service(project_root={checkpoint_dir}, config_path={config_name}, device={device})", flush=True)
+                print(f"[acestep] initialize_service(project_root={project_root}, config_path={config_name}, device={device})", flush=True)
                 _dit_handler.initialize_service(
-                    project_root=checkpoint_dir,
+                    project_root=project_root,
                     config_path=config_name,
                     device=device,
                 )
@@ -115,9 +102,11 @@ def get_handlers():
             raise RuntimeError("AceStepHandler.initialize_service() failed for all known config_path values")
 
         # LLM is optional — generation works without it (no chain-of-thought)
+        # checkpoint_dir for LLM = {project_root}/checkpoints where ACE-Step stores models
+        lm_checkpoint_dir = os.path.join(project_root, "checkpoints")
         try:
             _llm_handler.initialize(
-                checkpoint_dir=checkpoint_dir,
+                checkpoint_dir=lm_checkpoint_dir,
                 lm_model_path=lm_model,
                 device=device,
             )
