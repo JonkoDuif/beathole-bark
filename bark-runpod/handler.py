@@ -55,15 +55,23 @@ def _ensure_model_downloaded(checkpoint_dir):
     """Download ACE-Step model weights at runtime if not already present."""
     if not os.path.exists(os.path.join(checkpoint_dir, "config.json")):
         hf_token = os.environ.get("HF_TOKEN", None)
+        # Allow override via env var; try known repo IDs in order
+        hf_repo = os.environ.get("ACESTEP_HF_REPO", "")
+        candidates = [r for r in [hf_repo, "ACE-Step/ACE-Step-v1.5-base", "ACE-Step/Ace-Step1.5", "ACE-Step/ACE-Step-v1.5"] if r]
         print(f"[acestep] Model not found at {checkpoint_dir}, downloading from HuggingFace...", flush=True)
         os.makedirs(checkpoint_dir, exist_ok=True)
         from huggingface_hub import snapshot_download
-        snapshot_download(
-            "ACE-Step/ACE-Step-v1.5",
-            local_dir=checkpoint_dir,
-            token=hf_token,
-        )
-        print("[acestep] Model download complete.", flush=True)
+        last_err = None
+        for repo_id in candidates:
+            try:
+                print(f"[acestep] Trying repo: {repo_id}", flush=True)
+                snapshot_download(repo_id, local_dir=checkpoint_dir, token=hf_token)
+                print(f"[acestep] Model download complete from {repo_id}.", flush=True)
+                return
+            except Exception as e:
+                print(f"[acestep] Failed {repo_id}: {e}", flush=True)
+                last_err = e
+        raise RuntimeError(f"Could not download ACE-Step model from any known repo. Last error: {last_err}")
     else:
         print(f"[acestep] Model already present at {checkpoint_dir}", flush=True)
 
