@@ -865,7 +865,7 @@ function ParametricEQ({ bands, onChange }: { bands: EQBand[]; onChange: (bands: 
 
   }, [bands])
 
-  const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>, idx: number) => {
+  const handleMouseDown = (e: React.MouseEvent<SVGElement>, idx: number) => {
     e.preventDefault()
     const rect = svgRef.current!.getBoundingClientRect()
     const x = (e.clientX - rect.left) / rect.width * WIDTH
@@ -893,7 +893,7 @@ function ParametricEQ({ bands, onChange }: { bands: EQBand[]; onChange: (bands: 
 
   const handleMouseUp = () => setDragging(null)
 
-  const handleWheel = (e: React.WheelEvent<SVGSVGElement>, idx: number) => {
+  const handleWheel = (e: React.WheelEvent<SVGElement>, idx: number) => {
     e.preventDefault()
     const updated = bands.map((b, i) => i === idx ? {
       ...b,
