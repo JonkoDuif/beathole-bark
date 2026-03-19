@@ -94,16 +94,29 @@ def get_handlers():
 
     # ACE-Step 1.5 initialisation
     if hasattr(_dit_handler, "initialize_service"):
-        _dit_handler.initialize_service(
-            project_root=checkpoint_dir,
-            config_path="acestep-v15-base",
-            device=device,
-        )
-        _llm_handler.initialize(
-            checkpoint_dir=checkpoint_dir,
-            lm_model_path=lm_model,
-            device=device,
-        )
+        print(f"[acestep] Calling initialize_service(checkpoint_dir={checkpoint_dir}, device={device})", flush=True)
+        try:
+            # Try keyword arg 'checkpoint_dir' (ACE-Step 1.5 standard)
+            _dit_handler.initialize_service(
+                checkpoint_dir=checkpoint_dir,
+                device=device,
+            )
+        except TypeError:
+            # Fallback: some versions use positional or different kwarg
+            _dit_handler.initialize_service(checkpoint_dir, device=device)
+        print("[acestep] DIT handler initialized", flush=True)
+
+        # LLM is optional — skip if it fails (thinking mode still works without it)
+        try:
+            _llm_handler.initialize(
+                checkpoint_dir=checkpoint_dir,
+                lm_model_path=lm_model,
+                device=device,
+            )
+            print("[acestep] LLM handler initialized", flush=True)
+        except Exception as lm_err:
+            print(f"[acestep] LLM handler init failed (non-fatal): {lm_err}", flush=True)
+            _llm_handler = None
     else:
         # ACE-Step 1.0 fallback
         _dit_handler = _DitHandlerClass(model_name="acestep-5Hz-dit-base")
@@ -513,12 +526,32 @@ _stems_to_extract = _stems_to_generate
 def _ace_generate(dit, llm, params: GenerationParams, save_path: str) -> str:
     """Run generate_music and return the path to the output WAV file."""
     config = GenerationConfig(batch_size=1, audio_format="wav")
-    os.makedirs(os.path.dirname(save_path) if os.path.dirname(save_path) else "/tmp", exist_ok=True)
-    result = generate_music(dit, llm, params, config, save_dir=os.path.dirname(save_path) or "/tmp")
+    save_dir = os.path.dirname(save_path) or "/tmp"
+    os.makedirs(save_dir, exist_ok=True)
+
+    result = generate_music(dit, llm, params, config, save_dir=save_dir)
+
+    # Inspect result
     if hasattr(result, "audios"):
-        return result.audios[0]["path"]
-    # Fallback: result may be a list
-    return result[0] if isinstance(result, list) else str(result)
+        if result.audios:
+            return result.audios[0]["path"]
+        # audios is empty — log result for debugging and scan save_dir for output files
+        print(f"[acestep] WARNING: result.audios is empty. result={result!r}", flush=True)
+        wavs = sorted([
+            os.path.join(save_dir, f) for f in os.listdir(save_dir)
+            if f.endswith(".wav") or f.endswith(".mp3")
+        ], key=os.path.getmtime, reverse=True)
+        if wavs:
+            print(f"[acestep] Found output file in save_dir: {wavs[0]}", flush=True)
+            return wavs[0]
+        raise RuntimeError(f"generate_music returned empty audios. result={result!r}")
+
+    # Fallback: result may be a list of paths
+    if isinstance(result, (list, tuple)) and result:
+        return str(result[0])
+    if isinstance(result, str) and os.path.exists(result):
+        return result
+    raise RuntimeError(f"generate_music returned unexpected result type: {type(result)!r}: {result!r}")
 
 
 def _read_audio(path: str) -> np.ndarray:
