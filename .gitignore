@@ -1,0 +1,26 @@
+# Zip files
+*.zip
+
+# Audio files
+*.wav
+*.mp3
+
+# Docker layer cache files
+sha256:*
+
+# Misc
+transferring
+=
+__pycache__/
+*.pyc
+.env
+node_modules/
+
+# Old folder copies
+backend 2/
+frontend 2/
+frontend 3/
+frontend 4/
+frontend 5/
+beathole-frontend-new 2/
+{frontend,backend}/

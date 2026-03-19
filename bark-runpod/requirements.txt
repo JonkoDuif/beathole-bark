@@ -1,0 +1,8 @@
+# RunPod SDK
+runpod==1.7.2
+
+# ACE-Step 1.5 (installs transformers, diffusers, torch deps, soundfile, etc.)
+git+https://github.com/ace-step/ACE-Step-1.5.git
+
+# Numerics
+numpy==1.26.4
