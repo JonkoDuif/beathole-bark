@@ -302,13 +302,14 @@ MOOD_MAP = {
 GENRE_MELODY_STEM = {
     "trap":          "synth",
     "drill":         "synth",
-    "hip hop":       "keyboard",
-    "hip-hop":       "keyboard",
-    "boom bap":      "keyboard",
-    "r&b":           "keyboard",
+    "hip hop":       "piano",
+    "hip-hop":       "piano",
+    "rap":           "piano",
+    "boom bap":      "piano",
+    "r&b":           "piano",
     "afrobeats":     "keyboard",
     "dancehall":     "keyboard",
-    "lo-fi":         "keyboard",
+    "lo-fi":         "piano",
     "electronic":    "synth",
     "house":         "synth",
     "deep house":    "synth",
@@ -321,39 +322,45 @@ GENRE_MELODY_STEM = {
     "jungle":        "synth",
     "reggaeton":     "keyboard",
     "latin":         "keyboard",
-    "jazz":          "keyboard",
-    "soul":          "keyboard",
+    "jazz":          "piano",
+    "soul":          "piano",
     "funk":          "guitar",
-    "pop":           "keyboard",
+    "pop":           "piano",
     "cinematic":     "strings",
     "ambient":       "synth",
     "phonk":         "synth",
-    "cloud rap":     "keyboard",
+    "cloud rap":     "piano",
     "grime":         "synth",
     "uk garage":     "keyboard",
     "synthwave":     "synth",
     "vaporwave":     "synth",
     "hyperpop":      "synth",
-    "pluggnb":       "keyboard",
+    "pluggnb":       "piano",
     "jersey club":   "synth",
     "reggae":        "guitar",
     "blues":         "guitar",
     "rock":          "guitar",
-    "gospel":        "keyboard",
+    "gospel":        "piano",
 }
 
-# Keywords in user prompt → ACE-Step stem name to extract
+# Keywords in user prompt → ACE-Step stem name to generate
+# Piano and keyboard are separate stems so piano prompts get acoustic piano sound.
 INSTRUMENT_STEM_MAP = [
-    ("piano",           "keyboard"),
+    ("piano",           "piano"),       # acoustic piano
+    ("melodic piano",   "piano"),
+    ("sad piano",       "piano"),
+    ("type beat",       "piano"),       # "type beat" usually implies piano/melody
     ("epiano",          "keyboard"),
     ("e-piano",         "keyboard"),
     ("rhodes",          "keyboard"),
     ("organ",           "keyboard"),
+    ("keys",            "keyboard"),
     ("strings",         "strings"),
     ("violin",          "strings"),
     ("cello",           "strings"),
     ("viola",           "strings"),
     ("orchestra",       "strings"),
+    ("orchestral",      "strings"),
     ("brass",           "brass"),
     ("trumpet",         "brass"),
     ("trombone",        "brass"),
@@ -375,7 +382,9 @@ INSTRUMENT_STEM_MAP = [
 # Map ACE-Step stem name → studio instrument type
 ACE_STEM_TO_STUDIO = {
     "drums":     "drums",
+    "percs":     "drums",
     "bass":      "bass",
+    "piano":     "piano",
     "keyboard":  "piano",
     "guitar":    "synth",
     "strings":   "pad",
@@ -467,6 +476,8 @@ _PERC_GENRES = {
 }
 
 # Keywords to REMOVE from caption when generating a specific stem
+# Words to strip from the full-beat caption when building a stem caption.
+# Prevents the stem prompt from mentioning rival instruments.
 _STEM_EXCLUDE = {
     "drums":    ["bass", "guitar", "piano", "keyboard", "synth", "strings", "violin",
                  "cello", "flute", "trumpet", "saxophone", "sax", "melody", "chord",
@@ -475,14 +486,14 @@ _STEM_EXCLUDE = {
                  "chord", "pad", "lead", "kick", "snare", "hi-hat", "hihat"],
     "bass":     ["drums", "kick", "snare", "hi-hat", "hihat", "cymbal", "clap", "conga",
                  "guitar", "piano", "keyboard", "synth", "strings", "melody", "pad", "lead"],
-    "guitar":   ["drums", "kick", "snare", "hi-hat", "hihat", "cymbal", "clap", "conga",
-                 "bass", "piano", "strings", "melody"],
     "piano":    ["drums", "kick", "snare", "hi-hat", "hihat", "cymbal", "clap", "conga",
-                 "bass", "guitar", "synth", "pad"],
+                 "bass", "guitar", "synth", "pad", "keyboard", "strings"],
+    "guitar":   ["drums", "kick", "snare", "hi-hat", "hihat", "cymbal", "clap", "conga",
+                 "bass", "piano", "keyboard", "strings", "melody"],
     "keyboard": ["drums", "kick", "snare", "hi-hat", "hihat", "cymbal", "clap", "conga",
-                 "bass", "guitar"],
+                 "bass", "guitar", "piano"],
     "synth":    ["drums", "kick", "snare", "hi-hat", "hihat", "cymbal", "clap", "conga",
-                 "bass", "guitar", "piano", "strings"],
+                 "bass", "guitar", "piano", "keyboard", "strings"],
     "strings":  ["drums", "kick", "snare", "hi-hat", "hihat", "cymbal", "clap", "conga",
                  "bass", "guitar", "piano", "synth"],
     "brass":    ["drums", "kick", "snare", "hi-hat", "hihat", "cymbal", "clap", "conga",
@@ -493,19 +504,64 @@ _STEM_EXCLUDE = {
                  "guitar", "piano", "synth", "strings"],
 }
 
-# Instrument-specific tags to PREPEND per stem
+# Stem caption prefix: extremely explicit isolation language.
+# High guidance_scale (used below) keeps the model anchored to these words.
 _STEM_FOCUS = {
-    "drums":    "drums only, kick drum, snare, hi-hat, cymbal, no melody, no bass, no percussion, no chords",
-    "percs":    "percussion only, congas, bongos, shakers, tambourine, cowbell, clap, no kick, no snare, no hi-hat, no melody, no bass",
-    "bass":     "bass only, bass guitar, sub bass, 808, no drums, no melody, no chords",
-    "guitar":   "guitar only, guitar riff, guitar melody, clean guitar, no drums, no bass, no piano, no synth",
-    "piano":    "piano only, piano keys, piano melody, no drums, no bass, no guitar, no synth",
-    "keyboard": "keyboard only, synth keyboard, melodic chords, lead melody, no drums, no bass",
-    "synth":    "synth only, synth lead, synth arp, synth melody, no drums, no bass",
-    "strings":  "strings only, string section, orchestral strings, no drums, no bass, no guitar",
-    "brass":    "brass only, trumpet, trombone, brass stabs, no drums, no bass, no strings",
-    "woodwinds":"woodwinds only, flute, saxophone, clarinet, no drums, no bass",
-    "vocals":   "vocal chops only, vocal stabs, ad-libs, no instruments, no melody, no bass",
+    "drums":    (
+        "isolated drum track only, pure rhythm section, kick drum snare hi-hat cymbal, "
+        "absolutely no bass no guitar no piano no synth no melody no harmony no chords, "
+        "only percussion beats, silent everything except drums"
+    ),
+    "percs":    (
+        "isolated auxiliary percussion only, congas bongos shakers tambourine cowbell clap, "
+        "absolutely no kick drum no snare no hi-hat no bass no melody no synth no piano no guitar, "
+        "only secondary hand percussion, total silence of all other instruments"
+    ),
+    "bass":     (
+        "isolated bass line only, deep bass guitar sub bass 808 bassline, "
+        "absolutely no drums no kick no snare no hi-hat no guitar no piano no synth no melody, "
+        "only the bass frequency, silence everything except bass"
+    ),
+    "piano":    (
+        "isolated acoustic piano only, solo piano melody, piano keys acoustic grand piano, "
+        "absolutely no drums no bass no guitar no synth no strings no hi-hat no percussion, "
+        "only piano notes, complete silence of all other instruments"
+    ),
+    "guitar":   (
+        "isolated guitar only, solo guitar riff guitar melody clean guitar, "
+        "absolutely no drums no bass no piano no synth no strings no percussion, "
+        "only guitar, silence everything except guitar"
+    ),
+    "keyboard": (
+        "isolated keyboard only, electric piano rhodes organ keys, "
+        "absolutely no drums no bass no guitar no acoustic piano no percussion, "
+        "only keyboard, silence everything except keyboard"
+    ),
+    "synth":    (
+        "isolated synth lead only, synthesizer melody synth arp electronic lead, "
+        "absolutely no drums no bass no piano no guitar no strings no percussion, "
+        "only synthesizer, silence everything except synth"
+    ),
+    "strings":  (
+        "isolated string section only, orchestral strings violin cello viola, "
+        "absolutely no drums no bass no guitar no piano no synth no percussion, "
+        "only strings, silence everything except strings"
+    ),
+    "brass":    (
+        "isolated brass section only, trumpet trombone brass stabs horns, "
+        "absolutely no drums no bass no guitar no piano no synth no strings no percussion, "
+        "only brass instruments, silence everything except brass"
+    ),
+    "woodwinds":(
+        "isolated woodwinds only, flute saxophone clarinet oboe, "
+        "absolutely no drums no bass no guitar no piano no synth no strings no percussion, "
+        "only woodwind instruments, silence everything except woodwinds"
+    ),
+    "vocals":   (
+        "isolated vocal chops only, vocal stabs ad-libs vocal samples, "
+        "absolutely no instruments no drums no bass no guitar no piano no synth, "
+        "only vocals, silence everything except voice"
+    ),
 }
 
 
@@ -673,8 +729,11 @@ def generate_audio_with_stems(job_input: dict) -> dict:
                 keyscale        = key if key else None,
                 timesignature   = "4/4",
                 inference_steps = infer_step,
-                guidance_scale  = 7.5,
-                seed            = seed,  # identical seed → same rhythmic framework
+                # High guidance_scale forces strict adherence to the stem caption,
+                # minimising bleed from other instruments (7.5 is too permissive).
+                guidance_scale  = 15.0,
+                seed            = seed,  # identical seed → same rhythmic grid
+                thinking        = False, # no chain-of-thought for stems (faster)
             )
             # Apply reference audio to every stem so they share the same style
             if ref_path:
