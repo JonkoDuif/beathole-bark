@@ -708,85 +708,73 @@ def generate_audio_with_stems(job_input: dict) -> dict:
             f.write(base64.b64decode(ref_audio_b64))
         print(f"[gen] Reference audio saved", flush=True)
 
-    # ── 1. Generate each stem independently ──────────────────────────────────
-    # Same seed + BPM + key → stems sit on the same rhythmic grid.
-    # The main beat is built by mixing all generated stems together, giving
-    # perfectly clean, bleed-free stem files for studio use.
-    stems_to_gen = _stems_to_generate(genre, style, user_prompt)
-    print(f"[stems] Generating {len(stems_to_gen)} stems: {[s for s,_ in stems_to_gen]}", flush=True)
+    # ── 1. Generate the full beat (text2music) ────────────────────────────────
+    print(f"[gen] Generating full beat ({duration:.0f}s, {bpm} BPM, seed={seed})...", flush=True)
+    full_params = GenerationParams(
+        task_type       = "text2music",
+        caption         = tags,
+        lyrics          = lyrics_str,
+        duration        = int(duration),
+        bpm             = bpm,
+        keyscale        = key if key else None,
+        timesignature   = "4/4",
+        inference_steps = infer_step,
+        guidance_scale  = 7.5,
+        seed            = seed,
+    )
+    if ref_path:
+        full_params.audio2audio_enable = True
+        full_params.ref_audio_input    = ref_path
+        full_params.ref_audio_strength = ref_strength
 
-    stems_audio = {}   # stem_name → np.ndarray (native SAMPLE_RATE, possibly stereo)
+    full_beat_path = _ace_generate(dit, llm, full_params, "/tmp/bh_main.wav")
+    main_audio     = _read_audio(full_beat_path)
+    actual_dur     = (main_audio.shape[0] if main_audio.ndim == 1 else main_audio.shape[0]) / SAMPLE_RATE
+    print(f"[gen] Full beat done — shape: {main_audio.shape}, dur: {actual_dur:.1f}s", flush=True)
+
+    # ── 2. Extract each stem from the full beat (task_type="extract") ─────────
+    # ACE-Step's extract task isolates individual instruments from the mixed audio.
+    # This gives perfectly clean, bleed-free stems since they come from the beat itself.
+    # Supported ACE-Step track names for extract:
+    #   drums, bass, guitar, keyboard, percussion, strings, synth, brass, woodwinds,
+    #   vocals, backing_vocals, fx
+    # Our stem names → ACE-Step extract track name:
+    _EXTRACT_TRACK = {
+        "drums":     "drums",
+        "bass":      "bass",
+        "piano":     "keyboard",   # ACE-Step groups piano under "keyboard"
+        "keyboard":  "keyboard",
+        "guitar":    "guitar",
+        "synth":     "synth",
+        "strings":   "strings",
+        "brass":     "brass",
+        "woodwinds": "woodwinds",
+        "percs":     "percussion",
+        "vocals":    "vocals",
+    }
+
+    stems_to_gen = _stems_to_generate(genre, style, user_prompt)
+    print(f"[stems] Extracting {len(stems_to_gen)} stems: {[s for s,_ in stems_to_gen]}", flush=True)
+
+    stems_audio = {}
     for ace_stem, display_name in stems_to_gen:
-        print(f"[stems] Generating '{ace_stem}' stem ({duration:.0f}s)...", flush=True)
+        track_name = _EXTRACT_TRACK.get(ace_stem, ace_stem)
+        print(f"[stems] Extracting '{ace_stem}' (track='{track_name}')...", flush=True)
         try:
-            caption = _stem_tags(ace_stem, tags)
-            params  = GenerationParams(
-                task_type       = "text2music",
-                caption         = caption,
-                lyrics          = lyrics_str,
-                duration        = int(duration),
-                bpm             = bpm,
-                keyscale        = key if key else None,
-                timesignature   = "4/4",
-                inference_steps = infer_step,
-                # High guidance_scale forces strict adherence to the stem caption,
-                # minimising bleed from other instruments (7.5 is too permissive).
-                guidance_scale  = 15.0,
-                seed            = seed,  # identical seed → same rhythmic grid
-                thinking        = False, # no chain-of-thought for stems (faster)
+            ext_params = GenerationParams(
+                task_type   = "extract",
+                src_audio   = full_beat_path,
+                instruction = f"Extract the {track_name} track from the audio:",
+                thinking    = False,
             )
-            # Apply reference audio to every stem so they share the same style
-            if ref_path:
-                params.audio2audio_enable  = True
-                params.ref_audio_input     = ref_path
-                params.ref_audio_strength  = ref_strength
-            stem_path  = _ace_generate(dit, llm, params, f"/tmp/bh_stem_{ace_stem}.wav")
+            stem_path  = _ace_generate(dit, llm, ext_params, f"/tmp/bh_stem_{ace_stem}.wav")
             stem_audio = _read_audio(stem_path)
             stems_audio[ace_stem] = (stem_audio, display_name)
-            print(f"[stems] '{ace_stem}' done — shape: {stem_audio.shape}", flush=True)
+            print(f"[stems] '{ace_stem}' extracted — shape: {stem_audio.shape}", flush=True)
         except Exception as e:
-            print(f"[stems] '{ace_stem}' FAILED: {e}", flush=True)
+            print(f"[stems] '{ace_stem}' extraction FAILED: {e}", flush=True)
 
-    # ── 2. Mix all stems into the main beat ──────────────────────────────────
-    def _to_stereo_float32(audio: np.ndarray) -> np.ndarray:
-        """Ensure (samples, 2) float32."""
-        a = audio.astype(np.float32)
-        if a.ndim == 1:
-            a = np.stack([a, a], axis=1)
-        elif a.ndim == 2 and a.shape[0] < a.shape[1]:
-            a = a.T  # (channels, samples) → (samples, channels)
-        if a.shape[1] == 1:
-            a = np.concatenate([a, a], axis=1)
-        return a
-
-    if stems_audio:
-        arrays = [_to_stereo_float32(aud) for aud, _ in stems_audio.values()]
-        max_len = max(a.shape[0] for a in arrays)
-        padded  = [np.pad(a, ((0, max_len - a.shape[0]), (0, 0))) for a in arrays]
-        main_audio = np.sum(padded, axis=0)
-        # Normalize to prevent clipping
-        peak = np.max(np.abs(main_audio))
-        if peak > 0.95:
-            main_audio = main_audio * (0.90 / peak)
-        print(f"[gen] Mixed {len(stems_audio)} stems into main beat, shape: {main_audio.shape}", flush=True)
-    else:
-        # Fallback: generate a plain full-mix beat if all stems failed
-        print("[gen] All stems failed — generating fallback full-mix beat", flush=True)
-        fb_params = GenerationParams(
-            task_type="text2music", caption=tags, lyrics=lyrics_str,
-            duration=int(duration), bpm=bpm, keyscale=key if key else None,
-            timesignature="4/4", inference_steps=infer_step, guidance_scale=7.5, seed=seed,
-        )
-        if ref_path:
-            fb_params.audio2audio_enable = True
-            fb_params.ref_audio_input    = ref_path
-            fb_params.ref_audio_strength = ref_strength
-        main_path  = _ace_generate(dit, llm, fb_params, "/tmp/bh_main.wav")
-        main_audio = _read_audio(main_path)
-
-    actual_dur = (main_audio.shape[0] if main_audio.ndim == 2 else len(main_audio)) / SAMPLE_RATE
-
-    # ── 3. Upload stems to backend ───────────────────────────────────────────
+    # ── 3. Upload stems to backend ────────────────────────────────────────────
     backend_url  = os.environ.get("BACKEND_URL", "").rstrip("/")
     internal_key = os.environ.get("INTERNAL_API_KEY", "")
     stem_urls    = {}
@@ -804,7 +792,7 @@ def generate_audio_with_stems(job_input: dict) -> dict:
     else:
         print("[stems] Skipping upload — env vars not set", flush=True)
 
-    # ── 4. Upload main audio (avoids RunPod 10 MB payload limit) ────────────
+    # ── 4. Upload main beat ───────────────────────────────────────────────────
     wav_url = None
     if backend_url and internal_key and beat_id:
         try:
@@ -814,7 +802,7 @@ def generate_audio_with_stems(job_input: dict) -> dict:
         except Exception as e:
             print(f"[gen] Main beat upload failed: {e}", flush=True)
 
-    # ── 5. Return ────────────────────────────────────────────────────────────
+    # ── 5. Return ─────────────────────────────────────────────────────────────
     return {
         "wav_url":          wav_url,
         "stem_urls":        stem_urls,
