@@ -51,29 +51,66 @@ STEM_SR     = 22050   # stem upload sample rate — good quality, manageable siz
 _dit_handler = None
 _llm_handler = None
 
+def _patch_low_cpu_mem():
+    """
+    Monkey-patch PreTrainedModel.from_pretrained to force low_cpu_mem_usage=False.
+
+    ACE-Step's DiT model calls Tensor.item() during __init__ (e.g. for positional
+    encodings or layer-norm params). With low_cpu_mem_usage=True (the HF default),
+    tensors are placed on the 'meta' device first — meaning they have shape but no
+    data. Calling .item() on a meta tensor raises:
+      RuntimeError: Tensor.item() cannot be called on meta tensors
+
+    Forcing low_cpu_mem_usage=False makes from_pretrained load weights directly on
+    CPU with real data, so .item() works. ACE-Step then moves the model to CUDA.
+    """
+    try:
+        from transformers import modeling_utils as _mu
+        _orig = _mu.PreTrainedModel.from_pretrained
+
+        @classmethod
+        def _patched(cls, pretrained_model_name_or_path, *args, **kwargs):
+            kwargs.setdefault("low_cpu_mem_usage", False)
+            return _orig.__func__(cls, pretrained_model_name_or_path, *args, **kwargs)
+
+        _mu.PreTrainedModel.from_pretrained = _patched
+        print("[patch] from_pretrained patched: low_cpu_mem_usage=False default", flush=True)
+        return _orig  # caller can restore if needed
+    except Exception as e:
+        print(f"[patch] WARNING: could not patch from_pretrained: {e}", flush=True)
+        return None
+
+
+def _restore_pretrained(orig):
+    if orig is None:
+        return
+    try:
+        from transformers import modeling_utils as _mu
+        _mu.PreTrainedModel.from_pretrained = orig
+    except Exception:
+        pass
+
+
 def get_handlers():
     """
     Initialize AceStepHandler + LLMHandler.
 
     ACE-Step 1.5 uses project_root to locate its checkpoints:
-      {project_root}/checkpoints/acestep-v15-turbo/   ← DiT model
-      {project_root}/checkpoints/vae/                  ← VAE
-      {project_root}/checkpoints/Qwen3-Embedding-0.6B/ ← text encoder
+      {project_root}/checkpoints/acestep-v15-turbo/     <- DiT model
+      {project_root}/checkpoints/vae/                   <- VAE
+      {project_root}/checkpoints/Qwen3-Embedding-0.6B/  <- text encoder
 
-    initialize_service() handles downloading these automatically from HuggingFace
-    if they are not already present. Set ACESTEP_PROJECT_ROOT in the environment
-    (Dockerfile) so the files persist in a predictable location.
+    initialize_service() downloads these from HuggingFace automatically on
+    first run. Set ACESTEP_PROJECT_ROOT in the environment (Dockerfile) so
+    files persist at a known location across pod restarts.
     """
     global _dit_handler, _llm_handler
     if _dit_handler is not None:
         return _dit_handler, _llm_handler
 
-    # project_root: ACE-Step stores checkpoints under {project_root}/checkpoints/
-    # Default /app so files land in /app/checkpoints/ inside the container.
     project_root = os.environ.get("ACESTEP_PROJECT_ROOT", "/app")
     device       = "cuda" if torch.cuda.is_available() else "cpu"
     lm_model     = os.environ.get("ACESTEP_LM_MODEL", "acestep-5Hz-lm-0.6B")
-    hf_token     = os.environ.get("HF_TOKEN", None)
 
     print(f"[acestep] Loading handlers (device={device}, project_root={project_root})...", flush=True)
 
@@ -81,28 +118,46 @@ def get_handlers():
     _llm_handler = _LLMHandlerClass()
 
     if hasattr(_dit_handler, "initialize_service"):
+        # Patch from_pretrained so meta tensors are never created during DiT init.
+        orig_fp = _patch_low_cpu_mem()
+
         # ACE-Step/Ace-Step1.5 on HuggingFace is the turbo model.
-        # Try turbo first, fall back to base if missing.
-        init_ok = False
+        # Try turbo first, fall back to base.
         for config_name in ["acestep-v15-turbo", "acestep-v15-base"]:
+            print(f"[acestep] initialize_service(project_root={project_root}, config_path={config_name}, device={device})", flush=True)
             try:
-                print(f"[acestep] initialize_service(project_root={project_root}, config_path={config_name}, device={device})", flush=True)
                 _dit_handler.initialize_service(
                     project_root=project_root,
                     config_path=config_name,
                     device=device,
                 )
-                print(f"[acestep] DIT handler initialized OK (config_path={config_name})", flush=True)
-                init_ok = True
-                break
             except Exception as e:
-                print(f"[acestep] initialize_service config_path={config_name} failed: {e}", flush=True)
+                print(f"[acestep] initialize_service raised: {e}", flush=True)
 
-        if not init_ok:
-            raise RuntimeError("AceStepHandler.initialize_service() failed for all known config_path values")
+            # initialize_service swallows internal errors; check if model loaded.
+            if getattr(_dit_handler, "model", None) is not None:
+                print(f"[acestep] DIT model loaded OK (config_path={config_name})", flush=True)
+                break
+            print(f"[acestep] DIT model is None after config_path={config_name}, trying next...", flush=True)
+            # Reset handler state for next attempt
+            _dit_handler.model = None
+        else:
+            _restore_pretrained(orig_fp)
+            raise RuntimeError(
+                "AceStepHandler: model is None after all config_path attempts. "
+                "Check logs above for the underlying error."
+            )
+
+        _restore_pretrained(orig_fp)
+
+        # Verify all required components are present
+        missing = [c for c in ("model", "vae", "text_encoder", "text_tokenizer")
+                   if getattr(_dit_handler, c, None) is None]
+        if missing:
+            raise RuntimeError(f"AceStepHandler missing components after init: {missing}")
+        print("[acestep] All DIT components loaded", flush=True)
 
         # LLM is optional — generation works without it (no chain-of-thought)
-        # checkpoint_dir for LLM = {project_root}/checkpoints where ACE-Step stores models
         lm_checkpoint_dir = os.path.join(project_root, "checkpoints")
         try:
             _llm_handler.initialize(
@@ -112,7 +167,7 @@ def get_handlers():
             )
             print("[acestep] LLM handler initialized", flush=True)
         except Exception as lm_err:
-            print(f"[acestep] LLM handler init failed (non-fatal, generation continues): {lm_err}", flush=True)
+            print(f"[acestep] LLM init failed (non-fatal): {lm_err}", flush=True)
             _llm_handler = None
     else:
         # ACE-Step 1.0 fallback
