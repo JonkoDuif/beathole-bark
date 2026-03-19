@@ -675,62 +675,93 @@ _GENRE_ENERGY_TAGS = {
 # Guidance scale range (min, max) per genre.
 # A random value is sampled each generation so beats stay varied.
 # Higher values = ACE-Step sticks tighter to the genre description / more energy.
+# All ranges are intentionally high — beats should be full and energetic by default.
 _GENRE_GUIDANCE_RANGE = {
     # ── Electronic / club ──────────────────────────────────────────────────
-    "dubstep":       (9.0, 10.0),
-    "drum and bass": (8.5,  9.5),
-    "dnb":           (8.5,  9.5),
-    "jungle":        (8.5,  9.5),
-    "techno":        (8.5,  9.5),
-    "tech house":    (8.0,  9.0),
-    "edm":           (8.5,  9.5),
-    "house":         (7.5,  8.5),
-    "deep house":    (7.0,  8.0),
-    "electronic":    (8.0,  9.0),
-    "hyperpop":      (8.5,  9.5),
-    "jersey club":   (8.0,  9.0),
-    "uk garage":     (7.5,  8.5),
-    "grime":         (8.0,  9.0),
+    "dubstep":       (9.5, 10.0),
+    "drum and bass": (9.0, 10.0),
+    "dnb":           (9.0, 10.0),
+    "jungle":        (9.0, 10.0),
+    "techno":        (9.0, 10.0),
+    "tech house":    (8.5,  9.5),
+    "edm":           (9.0, 10.0),
+    "house":         (8.5,  9.5),
+    "deep house":    (8.0,  9.0),
+    "electronic":    (8.5,  9.5),
+    "hyperpop":      (9.0, 10.0),
+    "jersey club":   (8.5,  9.5),
+    "uk garage":     (8.0,  9.0),
+    "grime":         (8.5,  9.5),
     # ── Synthwave / retro ──────────────────────────────────────────────────
-    "synthwave":     (7.5,  8.5),
-    "vaporwave":     (6.5,  7.5),
+    "synthwave":     (8.0,  9.0),
+    "vaporwave":     (7.0,  8.0),
     # ── Hip-hop / rap ──────────────────────────────────────────────────────
-    "trap":          (7.5,  8.5),
-    "drill":         (7.5,  8.5),
-    "hip hop":       (7.0,  8.0),
-    "hip-hop":       (7.0,  8.0),
-    "rap":           (7.0,  8.0),
-    "boom bap":      (7.0,  8.0),
-    "phonk":         (7.5,  8.5),
-    "cloud rap":     (6.5,  7.5),
-    "pluggnb":       (6.5,  7.5),
+    "trap":          (8.0,  9.0),
+    "drill":         (8.0,  9.0),
+    "hip hop":       (7.5,  8.5),
+    "hip-hop":       (7.5,  8.5),
+    "rap":           (7.5,  8.5),
+    "boom bap":      (7.5,  8.5),
+    "phonk":         (8.0,  9.0),
+    "cloud rap":     (7.0,  8.0),
+    "pluggnb":       (7.0,  8.0),
     # ── R&B / Soul / Funk ──────────────────────────────────────────────────
-    "r&b":           (7.0,  8.0),
-    "soul":          (7.0,  8.0),
-    "funk":          (7.5,  8.5),
-    "gospel":        (7.5,  8.5),
+    "r&b":           (7.5,  8.5),
+    "soul":          (7.5,  8.5),
+    "funk":          (8.0,  9.0),
+    "gospel":        (8.0,  9.0),
     # ── Afro / Caribbean / Latin ───────────────────────────────────────────
-    "afrobeats":     (7.5,  8.5),
-    "dancehall":     (7.5,  8.5),
-    "reggaeton":     (7.5,  8.5),
-    "reggae":        (7.0,  8.0),
-    "latin":         (7.5,  8.5),
+    "afrobeats":     (8.0,  9.0),
+    "dancehall":     (8.0,  9.0),
+    "reggaeton":     (8.0,  9.0),
+    "reggae":        (7.5,  8.5),
+    "latin":         (8.0,  9.0),
     # ── Live instruments ───────────────────────────────────────────────────
-    "rock":          (8.0,  9.0),
-    "metal":         (8.5,  9.5),
-    "blues":         (7.0,  8.0),
-    "jazz":          (6.5,  7.5),
+    "rock":          (8.5,  9.5),
+    "metal":         (9.0, 10.0),
+    "blues":         (7.5,  8.5),
+    "jazz":          (7.0,  8.0),
     # ── Atmospheric / chill ────────────────────────────────────────────────
-    "lo-fi":         (6.0,  7.0),
-    "ambient":       (5.5,  6.5),
-    "cinematic":     (7.0,  8.0),
+    "lo-fi":         (6.5,  7.5),
+    "ambient":       (6.0,  7.0),
+    "cinematic":     (7.5,  8.5),
     # ── Pop ────────────────────────────────────────────────────────────────
-    "pop":           (7.0,  8.0),
+    "pop":           (7.5,  8.5),
 }
 
-def _get_guidance_scale(genre: str) -> float:
-    """Return a randomly sampled guidance scale for the given genre."""
-    lo, hi = _GENRE_GUIDANCE_RANGE.get(genre, (7.0, 8.0))
+# Tags injected when user specifies "energic" / "energetic" in their prompt
+_ENERGIC_BOOST_TAGS = [
+    "maximum energy, relentless intensity, explosive powerful production",
+    "full power, aggressive high-energy, overwhelming sonic force",
+    "peak energy, driving relentless momentum, intense high-impact sound",
+    "maximum intensity, hard-hitting explosive production, full-throttle energy",
+]
+
+# Explicit instrument descriptors — injected when user mentions a specific instrument
+# These go FIRST in the tag string so ACE-Step can't miss them
+_INSTRUMENT_FORCE_TAGS = {
+    "guitar":   "electric guitar lead, guitar-driven melody, prominent guitar riff",
+    "acoustic guitar": "fingerpicked acoustic guitar, acoustic guitar melody",
+    "piano":    "acoustic piano lead, piano-driven melody, prominent piano keys",
+    "synth":    "synthesizer lead, synth-driven melody, prominent synth line",
+    "bass":     "prominent bass line, bass-forward mix, deep bass groove",
+    "violin":   "violin lead melody, prominent violin, orchestral violin",
+    "strings":  "lush string arrangement, prominent strings, orchestral strings",
+    "brass":    "brass section, prominent brass stabs, horn melody",
+    "flute":    "flute melody, prominent flute, woodwind lead",
+    "saxophone": "saxophone melody, prominent sax, jazz saxophone lead",
+    "organ":    "Hammond organ, prominent organ, organ-driven groove",
+    "drums":    "prominent drum kit, drum-forward mix, powerful drum groove",
+}
+
+def _get_guidance_scale(genre: str, prompt: str = "") -> float:
+    """Return a randomly sampled guidance scale for the given genre.
+    If the user explicitly asked for 'energic'/'energetic', pin to 10.0.
+    """
+    p = prompt.lower() if prompt else ""
+    if "energic" in p or "energetic" in p:
+        return 10.0
+    lo, hi = _GENRE_GUIDANCE_RANGE.get(genre, (7.5, 8.5))
     return round(random.uniform(lo, hi), 2)
 
 # Melodic stem to extract per genre (ACE-Step extract instruction stem name)
@@ -932,60 +963,78 @@ _PRODUCTION_TECHNIQUES = [
 def build_tags(prompt: str, genre: str, mood: str, bpm: int, key: str) -> str:
     g = genre.lower().strip() if genre else ""
     m = mood.lower().strip() if mood else ""
+    p_lower = prompt.lower() if prompt else ""
+
+    is_energic = "energic" in p_lower or "energetic" in p_lower
 
     parts = []
 
-    # Genre: pick random variant for variety
+    # ── Explicit instrument override (FIRST so ACE-Step can't ignore it) ─────
+    # If user mentioned a specific instrument, force it to the front of the prompt
+    # so the genre default (e.g. "piano") doesn't override their intent.
+    for kw, force_tag in _INSTRUMENT_FORCE_TAGS.items():
+        if kw in p_lower:
+            parts.append(force_tag)
+            break  # only inject the most specific match
+
+    # ── Genre variant ─────────────────────────────────────────────────────────
     genre_variants = GENRE_VARIANTS.get(g)
     if genre_variants:
         parts.append(random.choice(genre_variants))
     elif g:
         parts.append(g)
 
-    # Genre-specific energy tag — always injected for energy-mapped genres
+    # ── Genre-specific energy tag ─────────────────────────────────────────────
     energy_tags = _GENRE_ENERGY_TAGS.get(g)
     if energy_tags:
         parts.append(random.choice(energy_tags))
 
-    # Mood: pick random variant for variety
+    # ── "Energic" boost — override everything with maximum intensity tags ─────
+    if is_energic:
+        parts.append(random.choice(_ENERGIC_BOOST_TAGS))
+        # Add a second energy descriptor for extra emphasis
+        parts.append("massive wall of sound, relentless high-energy arrangement, powerful full-mix impact")
+
+    # ── Mood ──────────────────────────────────────────────────────────────────
     mood_variants = MOOD_VARIANTS.get(m)
     if mood_variants:
         parts.append(random.choice(mood_variants))
     elif m:
         parts.append(m)
 
-    # User prompt
+    # ── User prompt ───────────────────────────────────────────────────────────
     if prompt:
         parts.append(prompt)
 
-    # Atmospheric feel tag (1 random pick, 60% chance)
+    # ── Atmospheric feel tag (60% chance) ─────────────────────────────────────
     if random.random() < 0.60:
         parts.append(random.choice(_FEEL_TAGS))
 
-    # Production texture specific to genre (1 random pick)
+    # ── Production texture ────────────────────────────────────────────────────
     textures = _PRODUCTION_TEXTURES.get(g, _PRODUCTION_TEXTURES["_default"])
     parts.append(random.choice(textures))
 
-    # Random production technique (1 pick)
+    # ── Production technique ──────────────────────────────────────────────────
     parts.append(random.choice(_PRODUCTION_TECHNIQUES))
 
-    # Harmonic color (40% chance — not every beat needs explicit harmony direction)
+    # ── Harmonic color (40% chance) ───────────────────────────────────────────
     if random.random() < 0.40:
         parts.append(random.choice(_HARMONIC_COLORS))
 
-    # Fixed quality markers
+    # ── Quality / energy footer ───────────────────────────────────────────────
     parts.append("instrumental, no vocals, no singing, no spoken words")
     if bpm:
         parts.append(f"{bpm} BPM")
     if key:
         parts.append(f"key of {key}")
-    # Energy/fullness qualifier — stronger for electronic genres
-    if g in _ELECTRONIC_GENRES:
+    if is_energic:
+        parts.append("explosive high-energy production, full powerful mix, maximum impact and intensity")
+    elif g in _ELECTRONIC_GENRES:
         parts.append("full energetic production, powerful mix, rich layered arrangement, high impact")
     else:
-        parts.append("professional studio production, rich mix depth, emotionally expressive")
+        parts.append("full energetic studio production, rich mix depth, powerful arrangement, emotionally expressive")
 
-    # Deduplicate preserving order
+    # ── Deduplicate preserving order ──────────────────────────────────────────
     seen, out = set(), []
     for p in parts:
         if p not in seen:
@@ -1558,7 +1607,7 @@ def generate_audio_with_stems(job_input: dict) -> dict:
     tags       = build_tags(user_prompt or style, genre, mood, bpm, key)
     lyrics_str = _build_lyrics_structure(duration, user_prompt, genre)
     seed       = random.randint(0, 2**31 - 1)
-    g_scale    = _get_guidance_scale(genre)
+    g_scale    = _get_guidance_scale(genre, user_prompt)
 
     print(f"[gen] Tags: {tags}", flush=True)
     print(f"[gen] Duration: {duration:.0f}s | BPM: {bpm} | Key: {key} | Seed: {seed} | guidance={g_scale}", flush=True)
@@ -2269,7 +2318,7 @@ def generate_midi_from_audio(job_input: dict) -> dict:
     tags       = build_tags(prompt, genre, mood, bpm, key)
     lyrics_str = _build_lyrics_structure(duration, prompt, genre)
     seed       = random.randint(0, 2**31 - 1)
-    g_scale    = _get_guidance_scale(genre)
+    g_scale    = _get_guidance_scale(genre, prompt)
 
     # ── 1. Generate full beat ─────────────────────────────────────────────────
     print(f"[midi-gen] Generating {duration:.0f}s beat for transcription...", flush=True)
