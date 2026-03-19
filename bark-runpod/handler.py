@@ -46,7 +46,7 @@ except Exception as e:
 
 # ── Config ────────────────────────────────────────────────────────────────────
 SAMPLE_RATE = 48000   # ACE-Step native output sample rate
-STEM_SR     = 16000   # down-sampled SR for stem uploads (smaller payload)
+STEM_SR     = 22050   # stem upload sample rate — good quality, manageable size
 
 _dit_handler = None
 _llm_handler = None
@@ -134,6 +134,21 @@ def resample_mono(audio: np.ndarray, src_sr: int, dst_sr: int) -> np.ndarray:
 
 
 # ── Utility: upload stem WAV to backend ───────────────────────────────────────
+def upload_main_audio(backend_url: str, api_key: str, beat_id: str, wav_b64: str) -> str:
+    payload = _json.dumps({
+        "beatId":    beat_id,
+        "wavBase64": wav_b64,
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        f"{backend_url.rstrip('/')}/api/internal/beats/upload",
+        data=payload,
+        headers={"Content-Type": "application/json", "x-internal-key": api_key},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        return _json.loads(resp.read())["url"]
+
+
 def upload_stem(backend_url: str, api_key: str, beat_id: str, stem_name: str, wav_b64: str) -> str:
     payload = _json.dumps({
         "beatId":    beat_id,
@@ -380,22 +395,104 @@ def _build_lyrics_structure(duration: float) -> str:
     return "\n[inst]\n".join(secs) + "\n[inst]"
 
 
-def _stems_to_extract(genre: str, style: str, user_prompt: str) -> list:
-    """Return list of (ace_stem_name, display_name) to extract."""
+# Genres that include auxiliary percussion (congas, shakers, tambourine, etc.)
+_PERC_GENRES = {
+    "afrobeats", "reggaeton", "latin", "dancehall", "funk", "jazz", "boom bap",
+    "trap", "hip hop", "hip-hop", "r&b", "soul", "phonk", "lo-fi", "grime",
+}
+
+# Keywords to REMOVE from caption when generating a specific stem
+_STEM_EXCLUDE = {
+    "drums":    ["bass", "guitar", "piano", "keyboard", "synth", "strings", "violin",
+                 "cello", "flute", "trumpet", "saxophone", "sax", "melody", "chord",
+                 "pad", "lead", "conga", "bongo", "shaker", "tambourine"],
+    "percs":    ["bass", "guitar", "piano", "keyboard", "synth", "strings", "melody",
+                 "chord", "pad", "lead", "kick", "snare", "hi-hat", "hihat"],
+    "bass":     ["drums", "kick", "snare", "hi-hat", "hihat", "cymbal", "clap", "conga",
+                 "guitar", "piano", "keyboard", "synth", "strings", "melody", "pad", "lead"],
+    "guitar":   ["drums", "kick", "snare", "hi-hat", "hihat", "cymbal", "clap", "conga",
+                 "bass", "piano", "strings", "melody"],
+    "piano":    ["drums", "kick", "snare", "hi-hat", "hihat", "cymbal", "clap", "conga",
+                 "bass", "guitar", "synth", "pad"],
+    "keyboard": ["drums", "kick", "snare", "hi-hat", "hihat", "cymbal", "clap", "conga",
+                 "bass", "guitar"],
+    "synth":    ["drums", "kick", "snare", "hi-hat", "hihat", "cymbal", "clap", "conga",
+                 "bass", "guitar", "piano", "strings"],
+    "strings":  ["drums", "kick", "snare", "hi-hat", "hihat", "cymbal", "clap", "conga",
+                 "bass", "guitar", "piano", "synth"],
+    "brass":    ["drums", "kick", "snare", "hi-hat", "hihat", "cymbal", "clap", "conga",
+                 "bass", "guitar", "piano", "synth", "strings"],
+    "woodwinds":["drums", "kick", "snare", "hi-hat", "hihat", "cymbal", "clap", "conga",
+                 "bass", "guitar", "synth", "strings"],
+    "vocals":   ["drums", "kick", "snare", "hi-hat", "hihat", "cymbal", "bass",
+                 "guitar", "piano", "synth", "strings"],
+}
+
+# Instrument-specific tags to PREPEND per stem
+_STEM_FOCUS = {
+    "drums":    "drums only, kick drum, snare, hi-hat, cymbal, no melody, no bass, no percussion, no chords",
+    "percs":    "percussion only, congas, bongos, shakers, tambourine, cowbell, clap, no kick, no snare, no hi-hat, no melody, no bass",
+    "bass":     "bass only, bass guitar, sub bass, 808, no drums, no melody, no chords",
+    "guitar":   "guitar only, guitar riff, guitar melody, clean guitar, no drums, no bass, no piano, no synth",
+    "piano":    "piano only, piano keys, piano melody, no drums, no bass, no guitar, no synth",
+    "keyboard": "keyboard only, synth keyboard, melodic chords, lead melody, no drums, no bass",
+    "synth":    "synth only, synth lead, synth arp, synth melody, no drums, no bass",
+    "strings":  "strings only, string section, orchestral strings, no drums, no bass, no guitar",
+    "brass":    "brass only, trumpet, trombone, brass stabs, no drums, no bass, no strings",
+    "woodwinds":"woodwinds only, flute, saxophone, clarinet, no drums, no bass",
+    "vocals":   "vocal chops only, vocal stabs, ad-libs, no instruments, no melody, no bass",
+}
+
+
+def _stem_tags(stem_name: str, full_tags: str) -> str:
+    """Build an instrument-focused caption for a single stem generation."""
+    focus   = _STEM_FOCUS.get(stem_name, f"{stem_name} only, isolated instrument")
+    exclude = _STEM_EXCLUDE.get(stem_name, [])
+
+    # Remove excluded instrument words from the full tags
+    filtered_words = []
+    for word in full_tags.split(","):
+        w = word.strip().lower()
+        if not any(ex in w for ex in exclude):
+            filtered_words.append(word.strip())
+
+    filtered = ", ".join(filtered_words)
+    return f"{focus}, {filtered}" if filtered else focus
+
+
+def _stems_to_generate(genre: str, style: str, user_prompt: str) -> list:
+    """
+    Return ordered list of (stem_name, display_name) for this beat.
+    Drums and bass are always included. Additional stems depend on genre/user input.
+    """
     combined = (style + " " + user_prompt).lower()
+    g = genre.lower() if genre else ""
+
     stems = [("drums", "Drums"), ("bass", "Bass")]
 
-    # User-requested instruments (check before genre default)
+    # Percussion for rhythm-heavy genres
+    if g in _PERC_GENRES or any(x in combined for x in ["conga", "bongo", "shaker", "tambourine", "perc", "cowbell"]):
+        stems.append(("percs", "Percs"))
+
+    # User-requested instruments
     user_stems_added = set()
     for kw, ace_stem in INSTRUMENT_STEM_MAP:
-        if kw in combined and ace_stem not in user_stems_added and ace_stem not in ("drums", "bass"):
+        if kw in combined and ace_stem not in user_stems_added and ace_stem not in ("drums", "bass", "percs"):
             stems.append((ace_stem, ace_stem.capitalize()))
             user_stems_added.add(ace_stem)
 
-    # Genre-based melody stem (if user didn't already add it)
-    genre_stem = GENRE_MELODY_STEM.get(genre.lower() if genre else "", "keyboard")
-    if genre_stem not in user_stems_added and genre_stem not in ("drums", "bass"):
+    # Genre-based melody stem
+    genre_stem = GENRE_MELODY_STEM.get(g, "keyboard")
+    if genre_stem not in user_stems_added and genre_stem not in ("drums", "bass", "percs"):
         stems.append((genre_stem, genre_stem.capitalize()))
+
+    # Add strings for cinematic/ambient/orchestral genres
+    if g in {"cinematic", "ambient", "classical", "orchestral"} and "strings" not in user_stems_added:
+        stems.append(("strings", "Strings"))
+
+    # Add brass for jazz/soul/funk if not already present
+    if g in {"jazz", "funk", "soul", "afrobeats"} and "brass" not in user_stems_added:
+        stems.append(("brass", "Brass"))
 
     # Deduplicate keeping first occurrence
     seen, out = set(), []
@@ -403,6 +500,10 @@ def _stems_to_extract(genre: str, style: str, user_prompt: str) -> list:
         if s[0] not in seen:
             seen.add(s[0]); out.append(s)
     return out
+
+
+# Keep old name as alias for any remaining references
+_stems_to_extract = _stems_to_generate
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -466,52 +567,80 @@ def generate_audio_with_stems(job_input: dict) -> dict:
             f.write(base64.b64decode(ref_audio_b64))
         print(f"[gen] Reference audio saved", flush=True)
 
-    # ── 1. Generate main beat ────────────────────────────────────────────────
-    print(f"[gen] Generating main beat ({duration:.0f}s, {infer_step} steps)...", flush=True)
+    # ── 1. Generate each stem independently ──────────────────────────────────
+    # Same seed + BPM + key → stems sit on the same rhythmic grid.
+    # The main beat is built by mixing all generated stems together, giving
+    # perfectly clean, bleed-free stem files for studio use.
+    stems_to_gen = _stems_to_generate(genre, style, user_prompt)
+    print(f"[stems] Generating {len(stems_to_gen)} stems: {[s for s,_ in stems_to_gen]}", flush=True)
 
-    main_params = GenerationParams(
-        task_type      = "text2music",
-        caption        = tags,
-        lyrics         = lyrics_str,
-        duration       = int(duration),
-        bpm            = bpm,
-        keyscale       = key if key else None,
-        timesignature  = "4/4",
-        inference_steps= infer_step,
-        guidance_scale = 7.5,
-        seed           = seed,
-    )
-
-    # Reference audio conditioning
-    if ref_path:
-        main_params.audio2audio_enable = True
-        main_params.ref_audio_input    = ref_path
-        main_params.ref_audio_strength = ref_strength
-
-    main_path = _ace_generate(dit, llm, main_params, "/tmp/bh_main.wav")
-    print(f"[gen] Main beat done → {main_path}", flush=True)
-
-    main_audio = _read_audio(main_path)
-
-    # ── 2. Extract stems from the generated audio ────────────────────────────
-    stems_to_extract = _stems_to_extract(genre, style, user_prompt)
-    print(f"[stems] Extracting: {[s for s,_ in stems_to_extract]}", flush=True)
-
-    stems_audio = {}
-    for ace_stem, display_name in stems_to_extract:
-        print(f"[stems] Extracting '{ace_stem}'...", flush=True)
+    stems_audio = {}   # stem_name → np.ndarray (native SAMPLE_RATE, possibly stereo)
+    for ace_stem, display_name in stems_to_gen:
+        print(f"[stems] Generating '{ace_stem}' stem ({duration:.0f}s)...", flush=True)
         try:
-            ext_params = GenerationParams(
-                task_type   = "extract",
-                src_audio   = main_path,
-                instruction = f"Extract the {ace_stem} track from the audio:",
+            caption = _stem_tags(ace_stem, tags)
+            params  = GenerationParams(
+                task_type       = "text2music",
+                caption         = caption,
+                lyrics          = lyrics_str,
+                duration        = int(duration),
+                bpm             = bpm,
+                keyscale        = key if key else None,
+                timesignature   = "4/4",
+                inference_steps = infer_step,
+                guidance_scale  = 7.5,
+                seed            = seed,  # identical seed → same rhythmic framework
             )
-            ext_path  = _ace_generate(dit, llm, ext_params, f"/tmp/bh_stem_{ace_stem}.wav")
-            stem_data = _read_audio(ext_path)
-            stems_audio[ace_stem] = (stem_data, display_name)
-            print(f"[stems] '{ace_stem}' extracted — shape: {stem_data.shape}", flush=True)
+            # Apply reference audio to every stem so they share the same style
+            if ref_path:
+                params.audio2audio_enable  = True
+                params.ref_audio_input     = ref_path
+                params.ref_audio_strength  = ref_strength
+            stem_path  = _ace_generate(dit, llm, params, f"/tmp/bh_stem_{ace_stem}.wav")
+            stem_audio = _read_audio(stem_path)
+            stems_audio[ace_stem] = (stem_audio, display_name)
+            print(f"[stems] '{ace_stem}' done — shape: {stem_audio.shape}", flush=True)
         except Exception as e:
-            print(f"[stems] '{ace_stem}' extract FAILED: {e}", flush=True)
+            print(f"[stems] '{ace_stem}' FAILED: {e}", flush=True)
+
+    # ── 2. Mix all stems into the main beat ──────────────────────────────────
+    def _to_stereo_float32(audio: np.ndarray) -> np.ndarray:
+        """Ensure (samples, 2) float32."""
+        a = audio.astype(np.float32)
+        if a.ndim == 1:
+            a = np.stack([a, a], axis=1)
+        elif a.ndim == 2 and a.shape[0] < a.shape[1]:
+            a = a.T  # (channels, samples) → (samples, channels)
+        if a.shape[1] == 1:
+            a = np.concatenate([a, a], axis=1)
+        return a
+
+    if stems_audio:
+        arrays = [_to_stereo_float32(aud) for aud, _ in stems_audio.values()]
+        max_len = max(a.shape[0] for a in arrays)
+        padded  = [np.pad(a, ((0, max_len - a.shape[0]), (0, 0))) for a in arrays]
+        main_audio = np.sum(padded, axis=0)
+        # Normalize to prevent clipping
+        peak = np.max(np.abs(main_audio))
+        if peak > 0.95:
+            main_audio = main_audio * (0.90 / peak)
+        print(f"[gen] Mixed {len(stems_audio)} stems into main beat, shape: {main_audio.shape}", flush=True)
+    else:
+        # Fallback: generate a plain full-mix beat if all stems failed
+        print("[gen] All stems failed — generating fallback full-mix beat", flush=True)
+        fb_params = GenerationParams(
+            task_type="text2music", caption=tags, lyrics=lyrics_str,
+            duration=int(duration), bpm=bpm, keyscale=key if key else None,
+            timesignature="4/4", inference_steps=infer_step, guidance_scale=7.5, seed=seed,
+        )
+        if ref_path:
+            fb_params.audio2audio_enable = True
+            fb_params.ref_audio_input    = ref_path
+            fb_params.ref_audio_strength = ref_strength
+        main_path  = _ace_generate(dit, llm, fb_params, "/tmp/bh_main.wav")
+        main_audio = _read_audio(main_path)
+
+    actual_dur = (main_audio.shape[0] if main_audio.ndim == 2 else len(main_audio)) / SAMPLE_RATE
 
     # ── 3. Upload stems to backend ───────────────────────────────────────────
     backend_url  = os.environ.get("BACKEND_URL", "").rstrip("/")
@@ -521,21 +650,29 @@ def generate_audio_with_stems(job_input: dict) -> dict:
     if backend_url and internal_key and beat_id:
         for ace_stem, (audio, _display) in stems_audio.items():
             try:
-                audio_mono = resample_mono(audio, SAMPLE_RATE, STEM_SR)
-                b64  = np_to_wav_b64(audio_mono, sr=STEM_SR)
+                audio_down = resample_mono(audio, SAMPLE_RATE, STEM_SR)
+                b64  = np_to_wav_b64(audio_down, sr=STEM_SR)
                 url  = upload_stem(backend_url, internal_key, beat_id, ace_stem, b64)
                 stem_urls[ace_stem] = url
                 print(f"[stems] Uploaded '{ace_stem}' → {url}", flush=True)
             except Exception as e:
                 print(f"[stems] Upload failed for '{ace_stem}': {e}", flush=True)
     else:
-        print("[stems] Skipping upload — BACKEND_URL / INTERNAL_API_KEY / beatId not set", flush=True)
+        print("[stems] Skipping upload — env vars not set", flush=True)
 
-    # ── 4. Return ────────────────────────────────────────────────────────────
-    actual_dur = len(main_audio) / SAMPLE_RATE if main_audio.ndim == 1 else main_audio.shape[-1] / SAMPLE_RATE
+    # ── 4. Upload main audio (avoids RunPod 10 MB payload limit) ────────────
+    wav_url = None
+    if backend_url and internal_key and beat_id:
+        try:
+            main_b64 = np_to_wav_b64(main_audio)
+            wav_url  = upload_main_audio(backend_url, internal_key, beat_id, main_b64)
+            print(f"[gen] Uploaded main beat → {wav_url}", flush=True)
+        except Exception as e:
+            print(f"[gen] Main beat upload failed: {e}", flush=True)
 
+    # ── 5. Return ────────────────────────────────────────────────────────────
     return {
-        "wav_base64":       np_to_wav_b64(main_audio),
+        "wav_url":          wav_url,
         "stem_urls":        stem_urls,
         "sample_rate":      SAMPLE_RATE,
         "duration_seconds": round(actual_dur, 2),
@@ -872,17 +1009,38 @@ def generate_midi_tracks(job_input: dict) -> dict:
     tracks = []
 
     # ── Drums ──────────────────────────────────────────────────────────────────
+    # GM notes: 36=Kick, 38=Snare, 39=Clap, 42=Closed HH, 46=Open HH,
+    #           49=Crash, 51=Ride, 54=Tambourine, 56=Cowbell, 63=HiConga,
+    #           64=LoConga, 69=Cabasa/Shaker
     if not no_drums:
         grid = get_drum_grid(genre)
-        kick_notes, snare_notes, hihat_notes = [], [], []
+        kick_notes, snare_notes, hihat_notes, clap_notes, perc_notes = [], [], [], [], []
+
+        # Genre-based clap/perc probability
+        clap_prob  = 0.85 if genre in {"trap","drill","phonk","hip hop","hip-hop","pop","edm","dancehall"} else 0.40
+        has_percs  = genre in _PERC_GENRES or any(x in user_p for x in ["perc","conga","shaker","cowbell"])
+        perc_note_choices = {
+            "afrobeats":  [(63, 0.7), (64, 0.5), (69, 0.6)],
+            "reggaeton":  [(63, 0.6), (64, 0.4), (54, 0.5)],
+            "latin":      [(63, 0.7), (64, 0.6), (54, 0.4)],
+            "funk":       [(54, 0.6), (56, 0.3), (69, 0.5)],
+            "jazz":       [(56, 0.3), (69, 0.4), (51, 0.5)],
+            "trap":       [(54, 0.4), (69, 0.5)],
+            "hip hop":    [(54, 0.4), (69, 0.4)],
+            "hip-hop":    [(54, 0.4), (69, 0.4)],
+            "boom bap":   [(54, 0.35), (69, 0.35)],
+            "lo-fi":      [(54, 0.35), (69, 0.3)],
+            "_default":   [(54, 0.25), (69, 0.3)],
+        }
+        perc_choices = perc_note_choices.get(genre, perc_note_choices["_default"])
 
         for bar in range(total_bars):
-            base   = bar * 4.0
+            base    = bar * 4.0
             is_fill = (bar % 8 == 7)
 
             for step in range(16):
                 swing_off = swing if (step % 4 == 2) else 0.0
-                t = base + step * 0.25 + swing_off
+                t      = base + step * 0.25 + swing_off
                 fill_b = 0.45 if (is_fill and step >= 12) else 0.0
 
                 p = min(1.0, grid['kick'][step] + fill_b * 0.30)
@@ -892,9 +1050,12 @@ def generate_midi_tracks(job_input: dict) -> dict:
 
                 p = min(1.0, grid['snare'][step] + fill_b * 0.40)
                 if p > 0 and random.random() < p:
-                    is_ghost  = grid['snare'][step] < 0.3
-                    base_vel  = 36 if is_ghost else 94
+                    is_ghost = grid['snare'][step] < 0.3
+                    base_vel = 36 if is_ghost else 94
                     snare_notes.append(make_note(38, t, 0.18, humanize(base_vel, 12)))
+                    # Clap layered on snare beats (not ghost notes)
+                    if not is_ghost and random.random() < clap_prob:
+                        clap_notes.append(make_note(39, t + random.uniform(0, 0.01), 0.12, humanize(82, 10)))
 
                 p = min(1.0, grid['hihat'][step] + fill_b * 0.50)
                 if p > 0 and random.random() < p:
@@ -904,9 +1065,21 @@ def generate_midi_tracks(job_input: dict) -> dict:
                     base_vel = 78 if step % 4 == 0 else 58
                     hihat_notes.append(make_note(note_num, t, dur, humanize(base_vel, 15)))
 
+                # Auxiliary percussion (congas, shaker, tambourine, cowbell)
+                if has_percs:
+                    for perc_note, perc_p in perc_choices:
+                        adjusted = min(1.0, perc_p + (fill_b * 0.2))
+                        if random.random() < adjusted:
+                            perc_notes.append(make_note(perc_note, t + random.uniform(0, 0.02),
+                                                        0.12, humanize(68, 15)))
+
         tracks.append({"name": "Kick",   "instrument": "drums", "notes": kick_notes,  "total_beats": total_bars * 4})
         tracks.append({"name": "Snare",  "instrument": "drums", "notes": snare_notes, "total_beats": total_bars * 4})
         tracks.append({"name": "Hi-Hat", "instrument": "drums", "notes": hihat_notes, "total_beats": total_bars * 4})
+        if clap_notes:
+            tracks.append({"name": "Clap",   "instrument": "drums", "notes": clap_notes,  "total_beats": total_bars * 4})
+        if perc_notes:
+            tracks.append({"name": "Percs",  "instrument": "drums", "notes": perc_notes,  "total_beats": total_bars * 4})
 
     # ── Bass line ─────────────────────────────────────────────────────────────
     bass_notes  = []
