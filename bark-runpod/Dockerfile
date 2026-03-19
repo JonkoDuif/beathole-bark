@@ -34,7 +34,8 @@ RUN pip install --no-cache-dir \
     --extra-index-url https://download.pytorch.org/whl/cu128 \
     accelerate diffusers diskcache einops "fastapi>=0.110.0" \
     "gradio==6.2.0" "lightning>=2.0.0" loguru lycoris-lora \
-    matplotlib modelscope transformers huggingface_hub soundfile
+    matplotlib modelscope transformers huggingface_hub soundfile \
+    vector_quantize_pytorch
 
 # 5. Install runpod + numpy
 COPY requirements.txt .
