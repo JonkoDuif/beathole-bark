@@ -53,7 +53,6 @@ except Exception as _bp_err:
     print(f"[startup] basic-pitch not available (MIDI transcription disabled): {_bp_err}", flush=True)
 
 try:
-    import torchaudio as _torchaudio
     from demucs.pretrained import get_model as _demucs_get_model
     from demucs.apply import apply_model as _demucs_apply
     _DEMUCS_OK = True
@@ -1313,9 +1312,18 @@ def separate_stems_demucs(audio_path: str) -> dict:
     d_sr    = model.samplerate   # 44100
 
     # ── Load + resample to Demucs SR ─────────────────────────────────────────
-    wav, src_sr = _torchaudio.load(audio_path)
+    # Use soundfile (already installed) to avoid torchaudio codec backend issues
+    # (torchaudio 2.10 defaults to torchcodec which may not be available)
+    audio_np, src_sr = sf.read(audio_path, dtype="float32", always_2d=True)
+    # soundfile returns [T, C] → convert to [C, T] tensor
+    wav = torch.from_numpy(audio_np.T.copy())   # [C, T]
     if src_sr != d_sr:
-        wav = _torchaudio.functional.resample(wav, src_sr, d_sr)
+        wav = torch.nn.functional.interpolate(
+            wav.unsqueeze(0),                  # [1, C, T]
+            size=int(wav.shape[-1] * d_sr / src_sr),
+            mode="linear",
+            align_corners=False,
+        ).squeeze(0)                            # [C, T]
 
     # Ensure stereo [2, T]
     if wav.shape[0] == 1:
