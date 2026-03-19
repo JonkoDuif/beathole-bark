@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 1. Install torch first (nano-vllm/flash-attn need it at build time)
 RUN pip install --no-cache-dir \
     --extra-index-url https://download.pytorch.org/whl/cu128 \
-    torch==2.6.0+cu128 torchaudio==2.6.0+cu128
+    torch==2.10.0+cu128 torchaudio==2.10.0+cu128
 
 # 2. Install nano-vllm (ACE-Step 1.5 dep, not on PyPI)
 RUN pip install --no-cache-dir \
