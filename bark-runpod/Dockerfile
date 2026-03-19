@@ -48,6 +48,9 @@ RUN pip install --no-cache-dir "transformers>=4.51.0,<4.58.0"
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# 6. Basic Pitch — audio-to-MIDI transcription for real stem notes
+RUN pip install --no-cache-dir basic-pitch
+
 COPY handler.py .
 
 CMD ["python", "-u", "handler.py"]

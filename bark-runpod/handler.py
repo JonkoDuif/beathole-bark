@@ -1,7 +1,7 @@
 """
 BeatHole AI — ACE-Step 1.5 RunPod Handler
 
-Audio mode : ACE-Step 1.5 text2music → stem extraction (drums/bass/melody/strings/synth)
+Audio mode : ACE-Step 1.5 text2music → stem extraction → Basic Pitch MIDI transcription
 MIDI mode  : Programmatic MIDI generation + ACE-Step preview audio
 """
 import sys, base64, io, os, math, random, json as _json, urllib.request, uuid
@@ -43,6 +43,14 @@ try:
         print("[startup] ACE-Step 1.0 handlers OK", flush=True)
 except Exception as e:
     print(f"[startup] ACE-STEP HANDLERS ERROR: {e}", flush=True); sys.exit(1)
+
+try:
+    from basic_pitch.inference import predict as _bp_predict
+    _BASIC_PITCH_OK = True
+    print("[startup] basic-pitch OK", flush=True)
+except Exception as _bp_err:
+    _BASIC_PITCH_OK = False
+    print(f"[startup] basic-pitch not available (MIDI transcription disabled): {_bp_err}", flush=True)
 
 # ── Config ────────────────────────────────────────────────────────────────────
 SAMPLE_RATE = 48000   # ACE-Step native output sample rate
@@ -657,6 +665,31 @@ def _ace_generate(dit, llm, params: GenerationParams, save_path: str) -> str:
 def _read_audio(path: str) -> np.ndarray:
     audio, _ = sf.read(path, dtype="float32")
     return audio
+
+
+def transcribe_to_midi(stem_path: str, bpm: float, stem_name: str) -> list:
+    """
+    Transcribe a pitched audio stem to MIDI notes using Basic Pitch.
+    Returns a list of note dicts in BeatHole format, or [] if unavailable/failed.
+    """
+    if not _BASIC_PITCH_OK:
+        return []
+    try:
+        print(f"[midi-transcribe] Transcribing '{stem_name}'...", flush=True)
+        _, _, note_events = _bp_predict(stem_path)
+        notes = []
+        beats_per_second = bpm / 60.0
+        for ev in note_events:
+            start_s, end_s, pitch, amplitude = ev[0], ev[1], ev[2], ev[3]
+            start_beat = round(start_s * beats_per_second, 4)
+            dur_beats  = round(max(0.0625, (end_s - start_s) * beats_per_second), 4)
+            velocity   = max(1, min(127, int(amplitude * 127)))
+            notes.append(make_note(int(pitch), start_beat, dur_beats, velocity))
+        print(f"[midi-transcribe] '{stem_name}': {len(notes)} notes", flush=True)
+        return notes
+    except Exception as e:
+        print(f"[midi-transcribe] '{stem_name}' failed: {e}", flush=True)
+        return []
 
 
 def generate_audio_with_stems(job_input: dict) -> dict:
@@ -1380,6 +1413,125 @@ def generate_midi_tracks(job_input: dict) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# ── MIDI mode — ACE-Step generation + Basic Pitch transcription ────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Stems eligible for MIDI transcription (pitched instruments only — no drums/percs)
+_MIDI_TRANSCRIBE_STEMS = {"bass", "piano", "keyboard", "guitar", "synth", "strings",
+                           "brass", "woodwinds"}
+
+# ACE-Step extract track name for each stem
+_MIDI_EXTRACT_TRACK = {
+    "bass":      "bass",
+    "piano":     "keyboard",
+    "keyboard":  "keyboard",
+    "guitar":    "guitar",
+    "synth":     "synth",
+    "strings":   "strings",
+    "brass":     "brass",
+    "woodwinds": "woodwinds",
+}
+
+
+def generate_midi_from_audio(job_input: dict) -> dict:
+    """
+    MIDI mode with real transcription via Basic Pitch:
+    1. Generate a full beat with ACE-Step (text2music, shorter duration for speed)
+    2. Extract each pitched stem with task_type="extract"
+    3. Transcribe each stem to MIDI via Basic Pitch (real notes from the audio)
+    4. Add hardcoded drum MIDI grid (Basic Pitch is a pitch tracker, not a drum detector)
+    5. Return MIDI tracks + main beat audio for the preview player
+    """
+    dit, dit_base, llm = get_handlers()
+
+    genre  = job_input.get("genre",  "").strip().lower()
+    mood   = job_input.get("mood",   "").strip().lower()
+    bpm    = int(job_input.get("bpm") or 120)
+    key    = (job_input.get("key") or "").strip()
+    prompt = (job_input.get("prompt") or job_input.get("style") or "").strip()
+    style  = job_input.get("style", "").strip()
+    user_p = prompt.lower()
+
+    # Use shorter duration in MIDI mode (extraction + transcription is slower)
+    _dur_raw = job_input.get("duration")
+    duration = float(_dur_raw) if _dur_raw else 90.0
+    duration = max(60.0, min(120.0, duration))
+
+    tags       = build_tags(prompt, genre, mood, bpm, key)
+    lyrics_str = _build_lyrics_structure(duration)
+    seed       = random.randint(0, 2**31 - 1)
+
+    # ── 1. Generate full beat ─────────────────────────────────────────────────
+    print(f"[midi-gen] Generating {duration:.0f}s beat for transcription...", flush=True)
+    full_params = GenerationParams(
+        task_type       = "text2music",
+        caption         = tags,
+        lyrics          = lyrics_str,
+        duration        = int(duration),
+        bpm             = bpm,
+        keyscale        = key if key else None,
+        timesignature   = "4/4",
+        inference_steps = 20,
+        guidance_scale  = 7.5,
+        seed            = seed,
+    )
+    full_beat_path = _ace_generate(dit, llm, full_params, "/tmp/bh_midi_main.wav")
+    main_audio     = _read_audio(full_beat_path)
+    actual_dur     = (len(main_audio) if main_audio.ndim == 1 else main_audio.shape[0]) / SAMPLE_RATE
+    total_beats    = round(actual_dur * bpm / 60)
+    print(f"[midi-gen] Beat done — {actual_dur:.1f}s", flush=True)
+
+    # ── 2. Extract pitched stems + transcribe to MIDI ─────────────────────────
+    stems_to_gen = _stems_to_generate(genre, style, prompt)
+    melodic_stems = [(s, d) for s, d in stems_to_gen if s in _MIDI_TRANSCRIBE_STEMS]
+
+    transcribed_tracks = []
+    for ace_stem, display_name in melodic_stems:
+        track_name = _MIDI_EXTRACT_TRACK.get(ace_stem, ace_stem)
+        print(f"[midi-gen] Extracting '{ace_stem}' (track='{track_name}')...", flush=True)
+        try:
+            ext_params = GenerationParams(
+                task_type   = "extract",
+                src_audio   = full_beat_path,
+                instruction = f"Extract the {track_name} track from the audio:",
+                thinking    = False,
+            )
+            stem_path = _ace_generate(dit_base, llm, ext_params, f"/tmp/bh_midi_stem_{ace_stem}.wav")
+            notes = transcribe_to_midi(stem_path, bpm, ace_stem)
+            if notes:
+                inst_type = ACE_STEM_TO_STUDIO.get(ace_stem, "synth")
+                transcribed_tracks.append({
+                    "name":        display_name,
+                    "instrument":  inst_type,
+                    "notes":       notes,
+                    "total_beats": total_beats,
+                })
+        except Exception as e:
+            print(f"[midi-gen] '{ace_stem}' extract/transcribe failed: {e}", flush=True)
+
+    # ── 3. Hardcoded drum MIDI (Basic Pitch is a pitch detector, not drum detector) ──
+    no_drums = any(x in user_p for x in ["no drums", "without drums", "drumless", "geen drums"])
+    drum_tracks = []
+    if not no_drums:
+        drum_job    = {**job_input, "duration": actual_dur}
+        drum_result = generate_midi_tracks(drum_job)
+        drum_tracks = [t for t in drum_result["midi_tracks"] if t["instrument"] == "drums"]
+
+    # Drums first, then transcribed melodic tracks
+    all_tracks = drum_tracks + transcribed_tracks
+
+    return {
+        "midi_tracks":      all_tracks,
+        "wav_base64":       np_to_wav_b64(main_audio),
+        "duration_seconds": round(actual_dur, 2),
+        "tempo_bpm":        bpm,
+        "key":              key,
+        "scale":            "minor" if genre in MINOR_GENRES else "major",
+        "total_bars":       total_beats // 4,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # ── RunPod handler ─────────────────────────────────────────────────────────────
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1391,11 +1543,17 @@ def handler(job: dict) -> dict:
 
     try:
         if output_mode == "midi":
-            midi_result = generate_midi_tracks(job_input)
-            wav_b64, dur = generate_preview_audio(job_input)
-            midi_result["wav_base64"]       = wav_b64
-            midi_result["duration_seconds"] = dur
-            return midi_result
+            if _BASIC_PITCH_OK:
+                # Real MIDI: generate beat → extract stems → Basic Pitch transcription
+                return generate_midi_from_audio(job_input)
+            else:
+                # Fallback: hardcoded MIDI patterns + short preview audio
+                print("[job] Basic Pitch unavailable — falling back to hardcoded MIDI", flush=True)
+                midi_result = generate_midi_tracks(job_input)
+                wav_b64, dur = generate_preview_audio(job_input)
+                midi_result["wav_base64"]       = wav_b64
+                midi_result["duration_seconds"] = dur
+                return midi_result
         else:
             return generate_audio_with_stems(job_input)
     except Exception as e:
