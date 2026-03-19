@@ -859,17 +859,85 @@ def build_tags(prompt: str, genre: str, mood: str, bpm: int, key: str) -> str:
     return ", ".join(out)
 
 
-def _build_lyrics_structure(duration: float) -> str:
-    """Section markers guide ACE-Step's internal arrangement dynamics."""
-    if duration <= 100:
-        secs = ["[intro]", "[verse]", "[chorus]", "[verse]", "[outro]"]
-    elif duration <= 160:
-        secs = ["[intro]", "[verse]", "[chorus]", "[verse]", "[chorus]", "[outro]"]
-    elif duration <= 220:
-        secs = ["[intro]", "[verse]", "[chorus]", "[verse]", "[chorus]", "[bridge]", "[outro]"]
+def _build_lyrics_structure(duration: float, user_prompt: str = "") -> str:
+    """
+    Build a section structure for ACE-Step's arrangement dynamics.
+
+    If the user mentions specific sections in the prompt (e.g. "2 verses 2 hooks
+    with a bridge"), parse those and use them verbatim.  Otherwise pick a random
+    structure that fits the duration so beats don't all follow the same pattern.
+    """
+    # ── Parse user-specified structure ──────────────────────────────────────
+    p = user_prompt.lower()
+
+    # Detect explicit section counts: "2 verses", "3 hooks", "1 bridge", etc.
+    import re as _re
+    def _count(pattern):
+        m = _re.search(r'(\d+)\s*' + pattern, p)
+        return int(m.group(1)) if m else None
+
+    n_verse  = _count(r'verse') or _count(r'couplet')
+    n_chorus = _count(r'(?:chorus|hook)')
+    n_pre    = _count(r'pre.?(?:hook|chorus)')
+    n_bridge = _count(r'bridge')
+    n_outro  = _count(r'outro')
+    n_intro  = _count(r'intro')
+
+    has_explicit = any(x is not None for x in [n_verse, n_chorus, n_pre, n_bridge])
+
+    if has_explicit:
+        secs = []
+        if n_intro is None or n_intro > 0:
+            secs.append("[intro]")
+        for i in range(n_verse or 1):
+            if n_pre and n_pre > 0:
+                secs.append("[pre-chorus]")
+            secs.append("[verse]")
+            if i < (n_chorus or 1):
+                secs.append("[chorus]")
+        for _ in range(max(0, (n_chorus or 1) - (n_verse or 1))):
+            secs.append("[chorus]")
+        for _ in range(n_bridge or 0):
+            secs.append("[bridge]")
+        if n_outro is None or n_outro > 0:
+            secs.append("[outro]")
+        return "\n[inst]\n".join(secs) + "\n[inst]"
+
+    # ── Random structure pool by duration ────────────────────────────────────
+    # Each entry is a list of section tags; pick one randomly.
+    if duration <= 90:
+        pool = [
+            ["[intro]", "[verse]", "[chorus]", "[outro]"],
+            ["[verse]", "[chorus]", "[verse]", "[outro]"],
+            ["[intro]", "[chorus]", "[verse]", "[chorus]"],
+        ]
+    elif duration <= 130:
+        pool = [
+            ["[intro]", "[verse]", "[chorus]", "[verse]", "[outro]"],
+            ["[intro]", "[verse]", "[pre-chorus]", "[chorus]", "[verse]", "[outro]"],
+            ["[intro]", "[chorus]", "[verse]", "[chorus]", "[bridge]", "[outro]"],
+            ["[verse]", "[chorus]", "[verse]", "[chorus]", "[outro]"],
+            ["[intro]", "[verse]", "[verse]", "[chorus]", "[chorus]", "[outro]"],
+        ]
+    elif duration <= 180:
+        pool = [
+            ["[intro]", "[verse]", "[pre-chorus]", "[chorus]", "[verse]", "[chorus]", "[outro]"],
+            ["[intro]", "[verse]", "[chorus]", "[verse]", "[chorus]", "[bridge]", "[outro]"],
+            ["[intro]", "[chorus]", "[verse]", "[pre-chorus]", "[chorus]", "[bridge]", "[chorus]", "[outro]"],
+            ["[intro]", "[verse]", "[chorus]", "[verse]", "[pre-chorus]", "[chorus]", "[outro]"],
+            ["[intro]", "[verse]", "[verse]", "[chorus]", "[bridge]", "[chorus]", "[outro]"],
+            ["[intro]", "[pre-chorus]", "[chorus]", "[verse]", "[chorus]", "[bridge]", "[outro]"],
+        ]
     else:
-        secs = ["[intro]", "[verse]", "[chorus]", "[verse]", "[chorus]",
-                "[verse]", "[chorus]", "[bridge]", "[outro]"]
+        pool = [
+            ["[intro]", "[verse]", "[pre-chorus]", "[chorus]", "[verse]", "[chorus]", "[bridge]", "[chorus]", "[outro]"],
+            ["[intro]", "[verse]", "[chorus]", "[verse]", "[chorus]", "[verse]", "[bridge]", "[outro]"],
+            ["[intro]", "[chorus]", "[verse]", "[pre-chorus]", "[chorus]", "[verse]", "[chorus]", "[bridge]", "[outro]"],
+            ["[intro]", "[verse]", "[verse]", "[chorus]", "[chorus]", "[bridge]", "[verse]", "[chorus]", "[outro]"],
+            ["[intro]", "[verse]", "[pre-chorus]", "[chorus]", "[bridge]", "[verse]", "[chorus]", "[outro]"],
+        ]
+
+    secs = random.choice(pool)
     return "\n[inst]\n".join(secs) + "\n[inst]"
 
 
@@ -1123,7 +1191,7 @@ def generate_audio_with_stems(job_input: dict) -> dict:
     ref_strength   = float(job_input.get("referenceStrength") or 0.5)
 
     tags       = build_tags(user_prompt or style, genre, mood, bpm, key)
-    lyrics_str = _build_lyrics_structure(duration)
+    lyrics_str = _build_lyrics_structure(duration, user_prompt)
     seed       = random.randint(0, 2**31 - 1)
 
     print(f"[gen] Tags: {tags}", flush=True)
@@ -1862,7 +1930,7 @@ def generate_midi_from_audio(job_input: dict) -> dict:
     duration = max(60.0, min(120.0, duration))
 
     tags       = build_tags(prompt, genre, mood, bpm, key)
-    lyrics_str = _build_lyrics_structure(duration)
+    lyrics_str = _build_lyrics_structure(duration, prompt)
     seed       = random.randint(0, 2**31 - 1)
 
     # ── 1. Generate full beat ─────────────────────────────────────────────────
