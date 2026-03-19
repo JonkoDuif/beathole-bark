@@ -16,12 +16,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ln -sf /usr/bin/python3 /usr/bin/python && \
     pip install --upgrade pip
 
-# Install ACE-Step 1.5 — it pins torch==2.10.0+cu128 internally
-# Add PyTorch cu128 index so pip can find it
-COPY requirements.txt .
-# nano-vllm is a dependency of ACE-Step 1.5 but not on PyPI — install from source first
+# 1. Install torch first (nano-vllm/flash-attn need it at build time)
+RUN pip install --no-cache-dir \
+    --extra-index-url https://download.pytorch.org/whl/cu128 \
+    torch==2.6.0+cu128 torchaudio==2.6.0+cu128
+
+# 2. Install nano-vllm (ACE-Step 1.5 dep, not on PyPI)
 RUN pip install --no-cache-dir \
     git+https://github.com/GeeeekExplorer/nano-vllm.git
+
+# 3. Install remaining requirements (ACE-Step + runpod + numpy)
+COPY requirements.txt .
 RUN pip install --no-cache-dir \
     --extra-index-url https://download.pytorch.org/whl/cu128 \
     -r requirements.txt
