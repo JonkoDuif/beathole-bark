@@ -16,20 +16,29 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ln -sf /usr/bin/python3 /usr/bin/python && \
     pip install --upgrade pip
 
-# 1. Install torch first (nano-vllm/flash-attn need it at build time)
+# 1. Install torch (required by nano-vllm/flash-attn at build time)
 RUN pip install --no-cache-dir \
     --extra-index-url https://download.pytorch.org/whl/cu128 \
     torch==2.10.0+cu128 torchaudio==2.10.0+cu128
 
-# 2. Install nano-vllm — needs --no-build-isolation so flash-attn can see torch
+# 2. Install nano-vllm with --no-build-isolation so flash-attn can find torch
 RUN pip install --no-cache-dir --no-build-isolation \
     git+https://github.com/GeeeekExplorer/nano-vllm.git
 
-# 3. Install remaining requirements (ACE-Step + runpod + numpy)
-COPY requirements.txt .
+# 3. Install ACE-Step with --no-deps to skip PyPI nano-vllm resolution
+RUN pip install --no-cache-dir --no-deps \
+    git+https://github.com/ace-step/ACE-Step-1.5.git
+
+# 4. Install ACE-Step's remaining dependencies (known from its pyproject.toml)
 RUN pip install --no-cache-dir \
     --extra-index-url https://download.pytorch.org/whl/cu128 \
-    -r requirements.txt
+    accelerate diffusers diskcache einops "fastapi>=0.110.0" \
+    "gradio==6.2.0" "lightning>=2.0.0" loguru lycoris-lora \
+    matplotlib modelscope transformers huggingface_hub soundfile
+
+# 5. Install runpod + numpy
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY handler.py .
 
