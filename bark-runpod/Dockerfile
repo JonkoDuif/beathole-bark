@@ -21,8 +21,8 @@ RUN pip install --no-cache-dir \
     --extra-index-url https://download.pytorch.org/whl/cu128 \
     torch==2.10.0+cu128 torchaudio==2.10.0+cu128
 
-# 2. Install nano-vllm (ACE-Step 1.5 dep, not on PyPI)
-RUN pip install --no-cache-dir \
+# 2. Install nano-vllm — needs --no-build-isolation so flash-attn can see torch
+RUN pip install --no-cache-dir --no-build-isolation \
     git+https://github.com/GeeeekExplorer/nano-vllm.git
 
 # 3. Install remaining requirements (ACE-Step + runpod + numpy)
