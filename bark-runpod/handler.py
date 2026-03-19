@@ -639,37 +639,81 @@ _ELECTRONIC_GENRES = {
     "grime", "uk garage",
 }
 
+# Mix fullness tags — always injected to push ACE-Step toward richer arrangements
+# These explicitly describe what a FULL, layered production sounds like
+_FULLNESS_TAGS = [
+    "multiple layered instruments, full rich arrangement, every frequency filled",
+    "dense layered production, bass, mid, and high elements all present, no empty space",
+    "full arrangement with drums, bass, melody, and atmosphere all active simultaneously",
+    "richly layered mix, sub bass, mid bass, synth leads, pads, and percussion all present",
+    "full-bodied production, powerful kick, deep bass, melodic layers, textured atmosphere",
+    "packed arrangement, multiple simultaneous instrument layers, full frequency spectrum",
+    "dense energetic mix, driving rhythm section with melodic and harmonic layers on top",
+    "full production with prominent drums, deep bass groove, lead melody, and supporting pads",
+]
+
 # Per-genre energy descriptors — one picked randomly and injected into the prompt
 _GENRE_ENERGY_TAGS = {
-    "dubstep":       ["massive sub-bass pressure", "face-melting bass modulation", "crushing drop energy",
-                      "filthy wobble bass", "half-time drum break fury", "reese bass destruction"],
-    "drum and bass": ["170 BPM relentless energy", "frantic rolling breaks", "sub-bass pressure and speed",
-                      "amen break intensity", "fast driving momentum"],
-    "dnb":           ["170 BPM relentless energy", "frantic rolling breaks", "sub-bass pressure and speed",
-                      "amen break intensity", "fast driving momentum"],
-    "techno":        ["relentless driving force", "crushing kick pressure", "hypnotic dark intensity",
-                      "industrial mechanical energy", "peak-hour peak power"],
-    "tech house":    ["hypnotic bass-driven intensity", "relentless groove pressure", "dark peak-hour energy",
-                      "driving mechanical force"],
-    "edm":           ["euphoric crowd energy", "massive drop impact", "stadium-filling power",
-                      "epic build tension release", "soaring festival energy"],
-    "house":         ["four-on-the-floor driving power", "peak-hour dancefloor energy",
-                      "full arrangement layered intensity", "crowd-lifting groove force"],
-    "electronic":    ["full-spectrum energy", "layered modular intensity", "driving electronic force",
-                      "complex high-energy production"],
-    "hyperpop":      ["chaotic maximum energy", "distorted glitch intensity", "maximalist overwhelming sound"],
-    "trap":          ["rolling hi-hat intensity", "heavy sub-bass pressure", "dark atmospheric energy",
-                      "punchy 808 weight"],
-    "drill":         ["cold menacing energy", "dark aggressive intensity", "heavy slide 808 weight",
-                      "relentless hard drive"],
-    "hip hop":       ["head-nodding groove power", "punchy drum impact", "deep bass pocket",
-                      "soulful harmonic richness"],
-    "boom bap":      ["knocking drum power", "punchy sample chop", "deep groove momentum"],
-    "phonk":         ["dark distorted energy", "heavy 808 aggression", "Memphis raw power",
-                      "chopped soul intensity"],
-    "grime":         ["staccato aggressive energy", "cold UK intensity", "hard-hitting dark power"],
-    "rock":          ["driving guitar power", "explosive live energy", "wall of sound intensity"],
-    "metal":         ["crushing heavy intensity", "thunderous drum power", "aggressive riff energy"],
+    "dubstep":       ["massive sub-bass pressure, crushing reese wobble, half-time fury",
+                      "face-melting bass modulation, filthy growl bass, devastating drop energy",
+                      "reese bass destruction, crushing kick, overwhelming sub-bass weight",
+                      "filthy wobble bass, relentless half-time groove, bone-crushing drop"],
+    "drum and bass": ["170 BPM relentless energy, frantic rolling breaks, sub-bass speed",
+                      "amen break intensity, fast driving momentum, deep sub pressure",
+                      "rapid breakbeat drive, powerful sub bass, relentless forward energy"],
+    "dnb":           ["170 BPM relentless energy, frantic rolling breaks, sub-bass speed",
+                      "amen break intensity, fast driving momentum, deep sub pressure",
+                      "rapid breakbeat drive, powerful sub bass, relentless forward energy"],
+    "jungle":        ["frantic chopped amen, reggae bass wobble, raw rhythmic intensity",
+                      "complex breakbeat patterns, deep bass pressure, underground raw power"],
+    "techno":        ["relentless driving force, crushing kick pressure, hypnotic dark intensity",
+                      "industrial mechanical energy, peak-hour power, cold relentless groove",
+                      "dystopian kick drive, pounding rhythm, dark hypnotic forward momentum"],
+    "tech house":    ["hypnotic bass-driven intensity, relentless groove pressure, peak-hour energy",
+                      "driving mechanical force, thick bass stab, pounding underground groove"],
+    "edm":           ["euphoric crowd energy, massive drop impact, stadium-filling power",
+                      "epic build tension release, soaring festival energy, huge crowd moment",
+                      "explosive drop energy, massive synth chord stabs, overwhelming crowd power"],
+    "house":         ["four-on-the-floor driving power, peak-hour dancefloor energy, full layers",
+                      "crowd-lifting groove force, stomping kick drive, soulful energetic arrangement"],
+    "deep house":    ["deep pulsing bass groove, warm driving energy, immersive dancefloor power"],
+    "electronic":    ["full-spectrum energy, layered modular intensity, driving electronic force",
+                      "complex high-energy production, powerful synth layers, relentless drive"],
+    "hyperpop":      ["chaotic maximum energy, distorted glitch intensity, maximalist overwhelming sound",
+                      "explosive glitch energy, heavy distorted 808, hyper-saturated production"],
+    "trap":          ["rolling hi-hat intensity, heavy sub-bass pressure, dark atmospheric energy",
+                      "punchy 808 weight, relentless trap groove, dense layered atmosphere"],
+    "drill":         ["cold menacing energy, dark aggressive intensity, heavy slide 808 weight",
+                      "relentless hard drive, ominous bass presence, cold brutal groove"],
+    "hip hop":       ["head-nodding groove power, punchy drum impact, deep bass pocket",
+                      "soulful harmonic richness, knocking beat momentum, full groove"],
+    "boom bap":      ["knocking drum power, punchy sample chop, deep groove momentum",
+                      "heavy drum knock, dusty soul energy, full boom bap groove"],
+    "phonk":         ["dark distorted energy, heavy 808 aggression, Memphis raw power",
+                      "chopped soul intensity, distorted bass, dark phonk groove force"],
+    "grime":         ["staccato aggressive energy, cold UK intensity, hard-hitting dark power",
+                      "relentless grime groove, cold stabs, aggressive forward drive"],
+    "rock":          ["driving guitar power, explosive live energy, wall of sound intensity",
+                      "full band arrangement, powerful drums, distorted guitar layers"],
+    "metal":         ["crushing heavy intensity, thunderous drum power, aggressive riff energy",
+                      "wall of distorted guitars, blastbeat power, overwhelming heavy force"],
+    "afrobeats":     ["infectious afro groove, layered percussion energy, vibrant full arrangement",
+                      "driving afrobeats rhythm, melodic hook energy, full percussive power"],
+    "reggaeton":     ["punchy dembow drive, thick bass presence, energetic Latin groove",
+                      "heavy dembow rhythm, urban bass energy, full reggaeton power"],
+    "latin":         ["vibrant layered percussion, brass and rhythm energy, full Latin arrangement"],
+    "funk":          ["deep funky groove, slapped bass power, full band funk energy",
+                      "tight syncopated rhythm, layered funk arrangement, groove-driven force"],
+    "soul":          ["deep soulful groove, full band arrangement, warm powerful energy",
+                      "layered soul production, gospel energy, rich harmonic power"],
+    "r&b":           ["smooth powerful groove, layered R&B arrangement, warm bass energy",
+                      "rich harmonic depth, full R&B production, punchy groove force"],
+    "synthwave":     ["pulsing retro energy, driving analog synth power, neon-lit momentum",
+                      "relentless synthwave drive, layered synth stacks, 80s peak energy"],
+    "pop":           ["hooky powerful energy, full polished arrangement, driving pop momentum",
+                      "layered pop production, punchy mix, catchy energetic arrangement"],
+    "cinematic":     ["sweeping dramatic power, full orchestral energy, cinematic climax force",
+                      "building tension and release, massive cinematic drop, overwhelming score energy"],
 }
 
 # Guidance scale range (min, max) per genre.
@@ -679,54 +723,54 @@ _GENRE_ENERGY_TAGS = {
 _GENRE_GUIDANCE_RANGE = {
     # ── Electronic / club ──────────────────────────────────────────────────
     "dubstep":       (9.5, 10.0),
-    "drum and bass": (9.0, 10.0),
-    "dnb":           (9.0, 10.0),
+    "drum and bass": (9.5, 10.0),
+    "dnb":           (9.5, 10.0),
     "jungle":        (9.0, 10.0),
-    "techno":        (9.0, 10.0),
-    "tech house":    (8.5,  9.5),
-    "edm":           (9.0, 10.0),
-    "house":         (8.5,  9.5),
-    "deep house":    (8.0,  9.0),
-    "electronic":    (8.5,  9.5),
-    "hyperpop":      (9.0, 10.0),
-    "jersey club":   (8.5,  9.5),
-    "uk garage":     (8.0,  9.0),
-    "grime":         (8.5,  9.5),
+    "techno":        (9.5, 10.0),
+    "tech house":    (9.0, 10.0),
+    "edm":           (9.5, 10.0),
+    "house":         (9.0, 10.0),
+    "deep house":    (8.5,  9.5),
+    "electronic":    (9.0, 10.0),
+    "hyperpop":      (9.5, 10.0),
+    "jersey club":   (9.0, 10.0),
+    "uk garage":     (8.5,  9.5),
+    "grime":         (9.0, 10.0),
     # ── Synthwave / retro ──────────────────────────────────────────────────
-    "synthwave":     (8.0,  9.0),
-    "vaporwave":     (7.0,  8.0),
+    "synthwave":     (8.5,  9.5),
+    "vaporwave":     (7.5,  8.5),
     # ── Hip-hop / rap ──────────────────────────────────────────────────────
-    "trap":          (8.0,  9.0),
-    "drill":         (8.0,  9.0),
-    "hip hop":       (7.5,  8.5),
-    "hip-hop":       (7.5,  8.5),
-    "rap":           (7.5,  8.5),
-    "boom bap":      (7.5,  8.5),
-    "phonk":         (8.0,  9.0),
-    "cloud rap":     (7.0,  8.0),
-    "pluggnb":       (7.0,  8.0),
+    "trap":          (8.5,  9.5),
+    "drill":         (8.5,  9.5),
+    "hip hop":       (8.0,  9.0),
+    "hip-hop":       (8.0,  9.0),
+    "rap":           (8.0,  9.0),
+    "boom bap":      (8.0,  9.0),
+    "phonk":         (8.5,  9.5),
+    "cloud rap":     (7.5,  8.5),
+    "pluggnb":       (7.5,  8.5),
     # ── R&B / Soul / Funk ──────────────────────────────────────────────────
-    "r&b":           (7.5,  8.5),
-    "soul":          (7.5,  8.5),
-    "funk":          (8.0,  9.0),
-    "gospel":        (8.0,  9.0),
+    "r&b":           (8.0,  9.0),
+    "soul":          (8.0,  9.0),
+    "funk":          (8.5,  9.5),
+    "gospel":        (8.5,  9.5),
     # ── Afro / Caribbean / Latin ───────────────────────────────────────────
-    "afrobeats":     (8.0,  9.0),
-    "dancehall":     (8.0,  9.0),
-    "reggaeton":     (8.0,  9.0),
-    "reggae":        (7.5,  8.5),
-    "latin":         (8.0,  9.0),
+    "afrobeats":     (8.5,  9.5),
+    "dancehall":     (8.5,  9.5),
+    "reggaeton":     (8.5,  9.5),
+    "reggae":        (8.0,  9.0),
+    "latin":         (8.5,  9.5),
     # ── Live instruments ───────────────────────────────────────────────────
-    "rock":          (8.5,  9.5),
-    "metal":         (9.0, 10.0),
-    "blues":         (7.5,  8.5),
-    "jazz":          (7.0,  8.0),
+    "rock":          (9.0, 10.0),
+    "metal":         (9.5, 10.0),
+    "blues":         (8.0,  9.0),
+    "jazz":          (7.5,  8.5),
     # ── Atmospheric / chill ────────────────────────────────────────────────
-    "lo-fi":         (6.5,  7.5),
-    "ambient":       (6.0,  7.0),
-    "cinematic":     (7.5,  8.5),
+    "lo-fi":         (7.0,  8.0),
+    "ambient":       (6.5,  7.5),
+    "cinematic":     (8.0,  9.0),
     # ── Pop ────────────────────────────────────────────────────────────────
-    "pop":           (7.5,  8.5),
+    "pop":           (8.0,  9.0),
 }
 
 # Tags injected when user specifies "energic" / "energetic" in their prompt
@@ -737,21 +781,101 @@ _ENERGIC_BOOST_TAGS = [
     "maximum intensity, hard-hitting explosive production, full-throttle energy",
 ]
 
-# Explicit instrument descriptors — injected when user mentions a specific instrument
-# These go FIRST in the tag string so ACE-Step can't miss them
+# Explicit instrument descriptors — injected when user mentions a specific instrument.
+# Each keyword maps to a LIST of variants so the same input sounds different each time.
+# These go FIRST in the tag string so ACE-Step can't miss them.
 _INSTRUMENT_FORCE_TAGS = {
-    "guitar":   "electric guitar lead, guitar-driven melody, prominent guitar riff",
-    "acoustic guitar": "fingerpicked acoustic guitar, acoustic guitar melody",
-    "piano":    "acoustic piano lead, piano-driven melody, prominent piano keys",
-    "synth":    "synthesizer lead, synth-driven melody, prominent synth line",
-    "bass":     "prominent bass line, bass-forward mix, deep bass groove",
-    "violin":   "violin lead melody, prominent violin, orchestral violin",
-    "strings":  "lush string arrangement, prominent strings, orchestral strings",
-    "brass":    "brass section, prominent brass stabs, horn melody",
-    "flute":    "flute melody, prominent flute, woodwind lead",
-    "saxophone": "saxophone melody, prominent sax, jazz saxophone lead",
-    "organ":    "Hammond organ, prominent organ, organ-driven groove",
-    "drums":    "prominent drum kit, drum-forward mix, powerful drum groove",
+    "acoustic guitar": [
+        "fingerpicked acoustic guitar with warm room reverb, intimate string resonance",
+        "open-tuned steel-string acoustic guitar, rich warm sustain",
+        "strummed acoustic guitar with natural body resonance, organic texture",
+        "fingerstyle acoustic guitar picking, delicate string tone, close-mic warmth",
+        "percussive acoustic guitar strumming, rhythmic body taps, raw organic feel",
+    ],
+    "guitar": [
+        "electric guitar lead melody, prominent guitar riff, guitar-driven sound",
+        "distorted electric guitar with chorus and reverb, powerful guitar tone",
+        "clean Fender Stratocaster guitar lead, glassy bright tone",
+        "warm Les Paul electric guitar, thick sustained melody",
+        "wah-pedal funk guitar, expressive tone, guitar-forward mix",
+        "slide guitar with heavy reverb, bluesy guitar lead",
+        "tremolo electric guitar, shimmering tone, guitar-driven melody",
+    ],
+    "dark piano": [
+        "dark minor-key piano, heavy resonant bass notes, ominous piano melody",
+        "detuned dark piano with reverb tail, haunting piano atmosphere",
+        "deep dark piano chords, dissonant minor harmony, brooding piano lead",
+        "dark prepared piano with eerie overtones, unsettling piano texture",
+        "slow dark piano melody, heavy sustain pedal, cinematic dark piano",
+    ],
+    "smooth piano": [
+        "smooth jazz piano comping, warm Rhodes-like tone, silky piano lead",
+        "gentle smooth piano melody, soft touch, warm harmonic piano texture",
+        "smooth laid-back piano groove, sophisticated chord voicings, velvet tone",
+        "soft smooth piano with light reverb, mellow melodic piano line",
+        "lush smooth piano arpeggios, warm sustain, elegant piano phrasing",
+    ],
+    "piano": [
+        "prominent acoustic piano lead, piano-driven melody, rich piano tone",
+        "expressive concert grand piano, dynamic piano melody, resonant strings",
+        "intimate upright piano, warm woody tone, piano-forward mix",
+        "bright studio piano, crisp attack, melodic piano hook",
+        "emotional piano ballad style, sensitive touch, singing piano line",
+        "dramatic piano with strong left hand, full piano arrangement",
+    ],
+    "synth": [
+        "prominent synthesizer lead melody, synth-driven hook, bright analog synth",
+        "fat detuned supersaw synth lead, wide stereo synth melody",
+        "warm Moog-style synth, smooth resonant lead, synth-forward mix",
+        "plucky arpeggio synth with filter envelope, rhythmic synth line",
+        "glassy FM synthesis lead, bell-like synth melody, bright digital tone",
+        "lush pad synth with slow attack, atmospheric synth lead, evolving tone",
+    ],
+    "bass": [
+        "prominent deep bass line, bass-forward mix, punchy sub groove",
+        "slapped Fender bass with funk groove, prominent bass melody",
+        "warm upright double bass, prominent bass, acoustic bass texture",
+        "filtered acid bass with resonance, prominent bass modulation",
+        "smooth fretless bass slide, prominent bass lead, melodic bass line",
+    ],
+    "violin": [
+        "solo violin lead melody, expressive vibrato, prominent violin",
+        "emotional violin with lush reverb, singing violin tone",
+        "pizzicato violin accents over sustained melody, prominent violin",
+        "raw folk violin, rich overtones, violin-driven melody",
+    ],
+    "strings": [
+        "lush orchestral string section with vibrato, full strings arrangement",
+        "sweeping string ensemble, rich harmonic strings, prominent string layer",
+        "tremolo string texture, building tension, prominent string arrangement",
+        "intimate string quartet, warm close-mic strings, melodic string lead",
+    ],
+    "brass": [
+        "prominent brass section, punchy horn stabs, brass-forward mix",
+        "smooth jazz trumpet lead, warm brass melody, prominent horn",
+        "bold trombone melody, rich brass tone, brass-driven arrangement",
+        "staccato brass stabs, energetic horn accents, prominent brass layer",
+    ],
+    "flute": [
+        "breathy solo flute melody, prominent flute, woodwind-driven sound",
+        "expressive flute with vibrato, warm flute tone, flute lead melody",
+        "alto flute, dark warm tone, prominent low flute melody",
+    ],
+    "saxophone": [
+        "tenor saxophone melody, prominent sax lead, jazz saxophone tone",
+        "alto saxophone with breathy tone, expressive sax melody, sax-forward",
+        "smooth saxophone solo, warm vibrato, prominent sax in the mix",
+    ],
+    "organ": [
+        "Hammond B3 organ with rotary speaker, prominent organ groove",
+        "gospel organ with full chords, organ-driven arrangement, warm organ",
+        "jazz organ comping, swirling rotary effect, prominent organ melody",
+    ],
+    "drums": [
+        "prominent drum kit, drum-forward mix, powerful live drum groove",
+        "heavy live drums with room reverb, dominant drum sound, driving rhythm",
+        "tight studio drum kit, punchy snare, prominent drum mix",
+    ],
 }
 
 def _get_guidance_scale(genre: str, prompt: str = "") -> float:
@@ -970,11 +1094,11 @@ def build_tags(prompt: str, genre: str, mood: str, bpm: int, key: str) -> str:
     parts = []
 
     # ── Explicit instrument override (FIRST so ACE-Step can't ignore it) ─────
-    # If user mentioned a specific instrument, force it to the front of the prompt
-    # so the genre default (e.g. "piano") doesn't override their intent.
-    for kw, force_tag in _INSTRUMENT_FORCE_TAGS.items():
+    # Check longest keyword first (e.g. "acoustic guitar" before "guitar",
+    # "dark piano" before "piano") so the most specific match wins.
+    for kw in sorted(_INSTRUMENT_FORCE_TAGS.keys(), key=len, reverse=True):
         if kw in p_lower:
-            parts.append(force_tag)
+            parts.append(random.choice(_INSTRUMENT_FORCE_TAGS[kw]))
             break  # only inject the most specific match
 
     # ── Genre variant ─────────────────────────────────────────────────────────
@@ -1009,6 +1133,9 @@ def build_tags(prompt: str, genre: str, mood: str, bpm: int, key: str) -> str:
     # ── Atmospheric feel tag (60% chance) ─────────────────────────────────────
     if random.random() < 0.60:
         parts.append(random.choice(_FEEL_TAGS))
+
+    # ── Mix fullness tag — always injected to push toward richer arrangements ─
+    parts.append(random.choice(_FULLNESS_TAGS))
 
     # ── Production texture ────────────────────────────────────────────────────
     textures = _PRODUCTION_TEXTURES.get(g, _PRODUCTION_TEXTURES["_default"])
