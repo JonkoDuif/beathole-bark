@@ -94,19 +94,27 @@ def get_handlers():
 
     # ACE-Step 1.5 initialisation
     if hasattr(_dit_handler, "initialize_service"):
-        print(f"[acestep] Calling initialize_service(checkpoint_dir={checkpoint_dir}, device={device})", flush=True)
-        try:
-            # Try keyword arg 'checkpoint_dir' (ACE-Step 1.5 standard)
-            _dit_handler.initialize_service(
-                checkpoint_dir=checkpoint_dir,
-                device=device,
-            )
-        except TypeError:
-            # Fallback: some versions use positional or different kwarg
-            _dit_handler.initialize_service(checkpoint_dir, device=device)
-        print("[acestep] DIT handler initialized", flush=True)
+        # Try turbo first (ACE-Step/Ace-Step1.5 on HF is the turbo model),
+        # fall back to base in case the user downloaded the base checkpoint.
+        init_ok = False
+        for config_name in ["acestep-v15-turbo", "acestep-v15-base"]:
+            try:
+                print(f"[acestep] initialize_service(project_root={checkpoint_dir}, config_path={config_name}, device={device})", flush=True)
+                _dit_handler.initialize_service(
+                    project_root=checkpoint_dir,
+                    config_path=config_name,
+                    device=device,
+                )
+                print(f"[acestep] DIT handler initialized OK (config_path={config_name})", flush=True)
+                init_ok = True
+                break
+            except Exception as e:
+                print(f"[acestep] initialize_service config_path={config_name} failed: {e}", flush=True)
 
-        # LLM is optional — skip if it fails (thinking mode still works without it)
+        if not init_ok:
+            raise RuntimeError("AceStepHandler.initialize_service() failed for all known config_path values")
+
+        # LLM is optional — generation works without it (no chain-of-thought)
         try:
             _llm_handler.initialize(
                 checkpoint_dir=checkpoint_dir,
@@ -115,7 +123,7 @@ def get_handlers():
             )
             print("[acestep] LLM handler initialized", flush=True)
         except Exception as lm_err:
-            print(f"[acestep] LLM handler init failed (non-fatal): {lm_err}", flush=True)
+            print(f"[acestep] LLM handler init failed (non-fatal, generation continues): {lm_err}", flush=True)
             _llm_handler = None
     else:
         # ACE-Step 1.0 fallback
