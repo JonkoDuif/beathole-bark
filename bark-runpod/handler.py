@@ -1153,6 +1153,90 @@ def _read_audio(path: str) -> np.ndarray:
     return audio
 
 
+def transcribe_drums_from_stem(drum_stem_path: str, bpm: float) -> list:
+    """
+    Transcribe a Demucs drum stem to MIDI notes via onset detection +
+    frequency-band classification (kick / snare / hi-hat / open hi-hat).
+
+    Uses librosa onset detection on the full drum stem, then analyses a short
+    window around each onset to decide which drum voice was hit.
+
+    Returns a list of note dicts in BeatHole format.
+    GM drum map: 36=Kick, 38=Snare, 42=Closed HH, 46=Open HH
+    """
+    try:
+        import librosa
+    except ImportError:
+        print("[drum-transcribe] librosa not available — falling back to hardcoded grid", flush=True)
+        return []
+
+    try:
+        print(f"[drum-transcribe] Loading drum stem...", flush=True)
+        audio, sr = librosa.load(drum_stem_path, sr=22050, mono=True)
+
+        # ── Onset detection ─────────────────────────────────────────────────
+        # Use the drum-optimised onset envelope (RMS energy changes)
+        onset_frames = librosa.onset.onset_detect(
+            y=audio, sr=sr,
+            units="time",
+            backtrack=True,
+            pre_max=2, post_max=2,
+            pre_avg=30, post_avg=30,
+            delta=0.07,
+            wait=5,
+        )
+        print(f"[drum-transcribe] {len(onset_frames)} onsets detected", flush=True)
+
+        beats_per_second = bpm / 60.0
+        WIN_SAMPLES      = int(0.05 * sr)   # 50 ms analysis window
+        notes            = []
+
+        for onset_time in onset_frames:
+            i0  = int(onset_time * sr)
+            i1  = min(i0 + WIN_SAMPLES, len(audio))
+            if i1 <= i0:
+                continue
+
+            window = audio[i0:i1]
+            peak   = float(np.max(np.abs(window)))
+            if peak < 0.01:        # skip very quiet hits (noise floor)
+                continue
+
+            # ── Frequency-band energy classification ────────────────────────
+            fft   = np.abs(np.fft.rfft(window, n=2048))
+            freqs = np.fft.rfftfreq(2048, d=1.0 / sr)
+
+            low  = float(np.sum(fft[(freqs >= 20)   & (freqs < 250)]))   # kick sub
+            mid  = float(np.sum(fft[(freqs >= 250)  & (freqs < 3000)]))  # snare body
+            high = float(np.sum(fft[(freqs >= 5000) & (freqs < 20000)])) # hihat
+            total = low + mid + high
+            if total < 1e-9:
+                continue
+
+            low_r, mid_r, high_r = low / total, mid / total, high / total
+
+            if low_r > 0.45:
+                midi_note = 36   # Kick
+            elif high_r > 0.45:
+                # Distinguish open vs closed hi-hat by energy duration
+                tail_end    = min(i0 + int(0.12 * sr), len(audio))
+                tail_rms    = float(np.sqrt(np.mean(audio[i1:tail_end] ** 2))) if tail_end > i1 else 0.0
+                midi_note   = 46 if tail_rms > 0.015 else 42
+            else:
+                midi_note = 38   # Snare
+
+            velocity   = max(40, min(127, int(peak * 127 * 2.5)))
+            start_beat = round(onset_time * beats_per_second, 4)
+            notes.append(make_note(midi_note, start_beat, 0.125, velocity))
+
+        print(f"[drum-transcribe] {len(notes)} drum MIDI notes produced", flush=True)
+        return notes
+
+    except Exception as e:
+        print(f"[drum-transcribe] Failed: {e}", flush=True)
+        return []
+
+
 def transcribe_to_midi(stem_path: str, bpm: float, stem_name: str) -> list:
     """
     Transcribe a pitched audio stem to MIDI notes using Basic Pitch.
@@ -2030,18 +2114,18 @@ def generate_midi_from_audio(job_input: dict) -> dict:
     total_beats    = round(actual_dur * bpm / 60)
     print(f"[midi-gen] Beat done — {actual_dur:.1f}s", flush=True)
 
-    # ── 2. Separate stems with Demucs + transcribe pitched stems to MIDI ──────
+    # ── 2. Separate stems with Demucs + transcribe all stems to MIDI ──────────
     print("[midi-gen] Separating stems with Demucs for MIDI transcription...", flush=True)
     transcribed_tracks = []
+    demucs_stems       = {}   # kept in outer scope so step 3 can access drum stem
     if _DEMUCS_OK:
         try:
             demucs_stems = separate_stems_demucs(full_beat_path)
-            # Transcribe every non-drum pitched stem with Basic Pitch
+            # Transcribe every pitched stem with Basic Pitch
             _MIDI_PITCH_STEMS = {"bass", "guitar", "piano", "synth"}
             for bh_key, (stem_mono, display_name, d_sr) in demucs_stems.items():
                 if bh_key not in _MIDI_PITCH_STEMS:
                     continue
-                # Write stem to temp WAV for Basic Pitch
                 stem_tmp = f"/tmp/bh_midi_demucs_{bh_key}.wav"
                 sf.write(stem_tmp, stem_mono, d_sr)
                 notes = transcribe_to_midi(stem_tmp, bpm, bh_key)
@@ -2059,13 +2143,32 @@ def generate_midi_from_audio(job_input: dict) -> dict:
     else:
         print("[midi-gen] Demucs unavailable — no MIDI transcription", flush=True)
 
-    # ── 3. Hardcoded drum MIDI (Basic Pitch is a pitch detector, not drum detector) ──
+    # ── 3. Drum MIDI from Demucs drum stem (onset detection + freq analysis) ──
     no_drums = any(x in user_p for x in ["no drums", "without drums", "drumless", "geen drums"])
     drum_tracks = []
     if not no_drums:
-        drum_job    = {**job_input, "duration": actual_dur}
-        drum_result = generate_midi_tracks(drum_job)
-        drum_tracks = [t for t in drum_result["midi_tracks"] if t["instrument"] == "drums"]
+        if "drums" in demucs_stems:
+            try:
+                drum_mono, _, d_sr = demucs_stems["drums"]
+                drum_tmp = "/tmp/bh_midi_demucs_drums.wav"
+                sf.write(drum_tmp, drum_mono, d_sr)
+                drum_notes = transcribe_drums_from_stem(drum_tmp, bpm)
+                if drum_notes:
+                    drum_tracks = [{
+                        "name":        "Drums",
+                        "instrument":  "drums",
+                        "notes":       drum_notes,
+                        "total_beats": total_beats,
+                    }]
+                    print(f"[midi-gen] drums → {len(drum_notes)} MIDI hits", flush=True)
+            except Exception as e:
+                print(f"[midi-gen] Drum transcription failed: {e}", flush=True)
+        if not drum_tracks:
+            # Fallback to genre-based grid if Demucs drum stem unavailable
+            print("[midi-gen] Falling back to hardcoded drum grid", flush=True)
+            drum_job    = {**job_input, "duration": actual_dur}
+            drum_result = generate_midi_tracks(drum_job)
+            drum_tracks = [t for t in drum_result["midi_tracks"] if t["instrument"] == "drums"]
 
     # Drums first, then transcribed melodic tracks
     all_tracks = drum_tracks + transcribed_tracks

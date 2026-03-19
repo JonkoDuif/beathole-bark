@@ -7,3 +7,6 @@ soundfile
 
 # Stem separation (replaces ACE-Step extract task)
 demucs
+
+# Drum onset detection for drum MIDI transcription
+librosa
