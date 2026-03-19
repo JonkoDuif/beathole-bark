@@ -1,0 +1,149 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-body: 'DM Sans Variable', 'DM Sans', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  background: #050508;
+  color: #E8E8F0;
+  font-family: var(--font-body);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0D0D14;
+}
+::-webkit-scrollbar-thumb {
+  background: #FF3D6E;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #CC1F4F;
+}
+
+/* Noise texture overlay — z-index intentionally omitted (auto) so it never blocks touch events */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.4;
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-forge-accent hover:bg-forge-accent-dim text-white font-semibold px-6 py-3 rounded-lg transition-all duration-200 hover:shadow-forge active:scale-95;
+  }
+
+  .btn-secondary {
+    @apply bg-forge-card border border-forge-border hover:border-forge-accent text-forge-text font-semibold px-6 py-3 rounded-lg transition-all duration-200 active:scale-95;
+  }
+
+  .btn-ghost {
+    @apply hover:bg-forge-card text-forge-muted hover:text-forge-text font-medium px-4 py-2 rounded-lg transition-all duration-200;
+  }
+
+  .card {
+    @apply bg-forge-card border border-forge-border rounded-2xl overflow-hidden;
+  }
+
+  .card-hover {
+    @apply card hover:border-forge-accent/40 transition-all duration-300 hover:shadow-forge cursor-pointer;
+  }
+
+  .input-forge {
+    @apply bg-forge-dark border border-forge-border rounded-lg px-4 py-3 text-forge-text placeholder-forge-muted focus:outline-none focus:border-forge-accent transition-colors w-full;
+  }
+
+  .label-forge {
+    @apply text-sm font-medium text-forge-muted mb-2 block;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium;
+  }
+
+  .badge-accent {
+    @apply badge bg-forge-accent/20 text-forge-accent border border-forge-accent/30;
+  }
+
+  .badge-gold {
+    @apply badge bg-forge-gold/20 text-forge-gold border border-forge-gold/30;
+  }
+
+  .badge-cyan {
+    @apply badge bg-forge-cyan/20 text-forge-cyan border border-forge-cyan/30;
+  }
+
+  .badge-purple {
+    @apply badge bg-forge-purple/20 text-forge-purple border border-forge-purple/30;
+  }
+
+  .stat-card {
+    @apply card p-6 flex flex-col gap-1;
+  }
+
+  .section-title {
+    @apply font-display text-4xl text-forge-text tracking-wide;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-forge bg-clip-text text-transparent;
+  }
+
+  .waveform-bar {
+    @apply bg-forge-accent rounded-full transition-all duration-150;
+    animation: waveform 1.5s ease-in-out infinite;
+  }
+
+  .glow-dot {
+    @apply w-2 h-2 rounded-full bg-forge-green;
+    box-shadow: 0 0 8px rgba(0, 255, 136, 0.8);
+  }
+}
+
+/* Waveform animation delays */
+.waveform-bar:nth-child(1) { animation-delay: 0.0s; }
+.waveform-bar:nth-child(2) { animation-delay: 0.1s; }
+.waveform-bar:nth-child(3) { animation-delay: 0.2s; }
+.waveform-bar:nth-child(4) { animation-delay: 0.3s; }
+.waveform-bar:nth-child(5) { animation-delay: 0.4s; }
+
+/* Page transitions */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.5s ease-out forwards;
+}
+
+.animate-fade-up-delay-1 { animation-delay: 0.1s; opacity: 0; animation-fill-mode: forwards; animation-name: fadeUp; animation-duration: 0.5s; }
+.animate-fade-up-delay-2 { animation-delay: 0.2s; opacity: 0; animation-fill-mode: forwards; animation-name: fadeUp; animation-duration: 0.5s; }
+.animate-fade-up-delay-3 { animation-delay: 0.3s; opacity: 0; animation-fill-mode: forwards; animation-name: fadeUp; animation-duration: 0.5s; }
+
+/* WaveSurfer overrides */
+wave {
+  overflow: hidden !important;
+}
