@@ -37,8 +37,12 @@ RUN pip install --no-cache-dir \
     --extra-index-url https://download.pytorch.org/whl/cu128 \
     accelerate diffusers diskcache einops "fastapi>=0.110.0" \
     "gradio==6.2.0" "lightning>=2.0.0" loguru lycoris-lora \
-    matplotlib modelscope transformers huggingface_hub soundfile \
-    vector_quantize_pytorch
+    matplotlib modelscope huggingface_hub soundfile \
+    vector_quantize_pytorch "typer-slim>=0.21.1"
+
+# Pin transformers to the version ACE-Step 1.5 requires (>=4.51.0,<4.58.0).
+# modelscope above may pull transformers 5.x which breaks ACE-Step internals.
+RUN pip install --no-cache-dir "transformers>=4.51.0,<4.58.0"
 
 # 5. Install runpod + numpy
 COPY requirements.txt .
