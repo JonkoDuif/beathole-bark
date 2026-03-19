@@ -1241,6 +1241,9 @@ export default function StudioPage() {
   const [inviteModal, setInviteModal] = useState(false)
   const [inviteUsername, setInviteUsername] = useState('')
   const [inviting, setInviting] = useState(false)
+  const [collaborators, setCollaborators] = useState<any[]>([])
+  const [collabsLoading, setCollabsLoading] = useState(false)
+  const [kickingCollaborator, setKickingCollaborator] = useState<string | null>(null)
 
   // Audio refs
   const audioCtxRef        = useRef<AudioContext | null>(null)
@@ -2026,14 +2029,26 @@ export default function StudioPage() {
   }
 
   // ── Invite collaborator ───────────────────────────────────────────────────────
+  const loadCollaborators = async () => {
+    setCollabsLoading(true)
+    try {
+      const res = await studioApi.collaborators(beatId)
+      setCollaborators(res.data ?? [])
+    } catch {
+      // non-fatal
+    } finally {
+      setCollabsLoading(false)
+    }
+  }
+
   const handleInvite = async () => {
     if (!inviteUsername.trim()) return
     setInviting(true)
     try {
       await studioApi.invite(beatId, inviteUsername.trim())
       toast.success(`Invitation sent to @${inviteUsername}`)
-      setInviteModal(false)
       setInviteUsername('')
+      loadCollaborators()
     } catch (err: any) {
       if (err.response?.data?.requiresPro) {
         toast.error('Studio collaboration requires Pro subscription')
@@ -2045,12 +2060,35 @@ export default function StudioPage() {
     }
   }
 
+  const handleKickCollaborator = async (userId: string, username: string) => {
+    setKickingCollaborator(userId)
+    try {
+      await studioApi.kickCollaborator(beatId, userId)
+      toast.success(`@${username} removed from collaboration`)
+      setCollaborators(prev => prev.filter(c => c.id !== userId))
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to remove collaborator')
+    } finally {
+      setKickingCollaborator(null)
+    }
+  }
+
   // ── Save project ──────────────────────────────────────────────────────────────
-  const saveProject = useCallback(() => {
+  const saveProject = useCallback(async () => {
     const proj = { beatId, bpm, tracks: tracks.map(({ audioBlob, ...t }) => t), savedAt: new Date().toISOString() }
     localStorage.setItem(`studio_project_${beatId}`, JSON.stringify(proj))
-    toast.success('Project saved')
-  }, [beatId, bpm, tracks])
+    // Also persist to server as a named version (version history)
+    try {
+      const res = await studioApi.saveVersion(beatId, {
+        project_data: proj,
+        label: `Saved by ${user?.display_name || user?.username || 'user'}`,
+      })
+      toast.success(`Project saved — v${res.data.version_number}`)
+    } catch {
+      // Server save failed (e.g. no auth) — local save still worked
+      toast.success('Project saved locally')
+    }
+  }, [beatId, bpm, tracks, user])
 
   // ── Export ────────────────────────────────────────────────────────────────────
   const handleExport = useCallback(async () => {
@@ -2481,7 +2519,7 @@ export default function StudioPage() {
         )}
         {isPro && (
           <button
-            onClick={() => setInviteModal(true)}
+            onClick={() => { setInviteModal(true); loadCollaborators() }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-forge-black border border-forge-border text-forge-muted hover:text-forge-cyan text-xs transition-colors"
             title="Invite collaborator">
             <Users size={12} /> Invite
@@ -2823,26 +2861,66 @@ export default function StudioPage() {
       {/* ── Context Menu ────────────────────────────────────────────────────── */}
       {inviteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setInviteModal(false)}>
-          <div className="bg-forge-card border border-forge-border rounded-2xl p-6 w-full max-w-sm shadow-xl mx-4" onClick={e => e.stopPropagation()}>
+          <div className="bg-forge-card border border-forge-border rounded-2xl p-6 w-full max-w-md shadow-xl mx-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-display text-lg text-white">Invite Collaborator</h3>
+              <h3 className="font-display text-lg text-white flex items-center gap-2"><Users size={18} className="text-forge-orange" />Collaborators</h3>
               <button onClick={() => setInviteModal(false)} className="text-forge-muted hover:text-forge-text"><X size={18} /></button>
             </div>
-            <p className="text-forge-muted text-sm mb-4">Invite someone to collaborate on this beat in real-time.</p>
-            <input
-              autoFocus
-              value={inviteUsername}
-              onChange={e => setInviteUsername(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleInvite()}
-              className="input-forge w-full mb-4"
-              placeholder="@username"
-            />
-            <div className="flex gap-2">
-              <button onClick={() => setInviteModal(false)} className="flex-1 btn-secondary py-2">Cancel</button>
-              <button onClick={handleInvite} disabled={inviting} className="flex-1 btn-primary py-2 flex items-center justify-center gap-2 disabled:opacity-50">
-                {inviting ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
-                Send Invite
-              </button>
+
+            {/* Current collaborators */}
+            <div className="mb-4">
+              {collabsLoading ? (
+                <div className="flex items-center gap-2 text-forge-muted text-sm py-2">
+                  <Loader2 size={14} className="animate-spin" /> Loading…
+                </div>
+              ) : collaborators.length === 0 ? (
+                <p className="text-forge-muted text-sm py-2">No collaborators yet.</p>
+              ) : (
+                <ul className="space-y-2 mb-2">
+                  {collaborators.map(c => (
+                    <li key={c.id} className="flex items-center justify-between gap-3 bg-forge-black/50 rounded-lg px-3 py-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {c.avatar_url ? (
+                          <img src={c.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-7 h-7 rounded-full bg-forge-orange/20 flex items-center justify-center flex-shrink-0 text-xs text-forge-orange font-bold">
+                            {(c.display_name || c.username || '?')[0].toUpperCase()}
+                          </div>
+                        )}
+                        <span className="text-white text-sm truncate">@{c.username || c.display_name}</span>
+                      </div>
+                      <button
+                        onClick={() => handleKickCollaborator(c.id, c.username || c.display_name)}
+                        disabled={kickingCollaborator === c.id}
+                        className="flex items-center gap-1 px-2 py-1 rounded text-xs text-red-400 hover:bg-red-500/10 border border-red-500/20 hover:border-red-500/40 transition-colors disabled:opacity-50 flex-shrink-0"
+                        title="Remove collaborator"
+                      >
+                        {kickingCollaborator === c.id ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
+                        Kick
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="border-t border-forge-border pt-4">
+              <p className="text-forge-muted text-xs mb-3">Invite someone by username</p>
+              <input
+                autoFocus
+                value={inviteUsername}
+                onChange={e => setInviteUsername(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleInvite()}
+                className="input-forge w-full mb-3"
+                placeholder="@username"
+              />
+              <div className="flex gap-2">
+                <button onClick={() => setInviteModal(false)} className="flex-1 btn-secondary py-2">Close</button>
+                <button onClick={handleInvite} disabled={inviting} className="flex-1 btn-primary py-2 flex items-center justify-center gap-2 disabled:opacity-50">
+                  {inviting ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
+                  Send Invite
+                </button>
+              </div>
             </div>
           </div>
         </div>

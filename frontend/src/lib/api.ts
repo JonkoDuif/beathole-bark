@@ -175,6 +175,8 @@ export const studioApi = {
   pendingInvitations: () => api.get('/studio/invitations/pending'),
   collaborators: (beatId: string) => api.get(`/studio/${beatId}/collaborators`),
   myCollabs: () => api.get('/studio/my-collabs'),
+  kickCollaborator: (beatId: string, userId: string) =>
+    api.delete(`/studio/${beatId}/collaborators/${userId}`),
 }
 
 // ─── Presets ─────────────────────────────────────────────────────────────────
