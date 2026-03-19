@@ -51,6 +51,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 6. Basic Pitch — audio-to-MIDI transcription for real stem notes
 RUN pip install --no-cache-dir basic-pitch
 
+# 7. Demucs — neural source separator (replaces ACE-Step extract for clean stems)
+RUN pip install --no-cache-dir demucs
+# Pre-download the 6-stem model at build time (avoids cold-start download)
+RUN python -c "from demucs.pretrained import get_model; get_model('htdemucs_6s')"
+
 COPY handler.py .
 
 CMD ["python", "-u", "handler.py"]

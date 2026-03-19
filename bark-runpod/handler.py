@@ -52,6 +52,16 @@ except Exception as _bp_err:
     _BASIC_PITCH_OK = False
     print(f"[startup] basic-pitch not available (MIDI transcription disabled): {_bp_err}", flush=True)
 
+try:
+    import torchaudio as _torchaudio
+    from demucs.pretrained import get_model as _demucs_get_model
+    from demucs.apply import apply_model as _demucs_apply
+    _DEMUCS_OK = True
+    print("[startup] demucs OK", flush=True)
+except Exception as _demucs_err:
+    _DEMUCS_OK = False
+    print(f"[startup] demucs not available: {_demucs_err}", flush=True)
+
 # ── Config ────────────────────────────────────────────────────────────────────
 SAMPLE_RATE = 48000   # ACE-Step native output sample rate
 STEM_SR     = 22050   # stem upload sample rate — good quality, manageable size
@@ -59,6 +69,10 @@ STEM_SR     = 22050   # stem upload sample rate — good quality, manageable siz
 _dit_handler       = None   # turbo — text2music generation
 _dit_base_handler  = None   # base  — extract task (turbo does NOT support extract)
 _llm_handler       = None
+
+_demucs_model      = None
+_DEMUCS_MODEL_NAME = "htdemucs_6s"
+_DEMUCS_SR         = 44100   # htdemucs native sample rate
 
 def _patch_low_cpu_mem():
     """
@@ -1164,6 +1178,98 @@ def transcribe_to_midi(stem_path: str, bpm: float, stem_name: str) -> list:
         return []
 
 
+# Maps Demucs source names → (beathole_stem_key, display_name)
+_DEMUCS_STEM_MAP = {
+    "drums":  ("drums",  "Drums"),
+    "bass":   ("bass",   "Bass"),
+    "guitar": ("guitar", "Guitar"),
+    "piano":  ("piano",  "Piano"),
+    "other":  ("synth",  "Synth"),    # synth / pads / arps / misc melody
+    "vocals": ("vocals", "Vocals"),
+}
+
+# Demucs stem key → studio instrument type
+_DEMUCS_INST_TYPE = {
+    "drums":  "drums",
+    "bass":   "bass",
+    "guitar": "synth",
+    "piano":  "piano",
+    "synth":  "synth",
+    "vocals": "pad",
+}
+
+
+def _get_demucs():
+    """Lazy-load and return the Demucs htdemucs_6s model."""
+    global _demucs_model
+    if _demucs_model is None:
+        print(f"[demucs] Loading {_DEMUCS_MODEL_NAME}...", flush=True)
+        _demucs_model = _demucs_get_model(_DEMUCS_MODEL_NAME)
+        _demucs_model.eval()
+        if torch.cuda.is_available():
+            _demucs_model.cuda()
+        print(f"[demucs] Loaded — stems: {_demucs_model.sources}", flush=True)
+    return _demucs_model
+
+
+def separate_stems_demucs(audio_path: str) -> dict:
+    """
+    Separate a mixed audio file into stems using Demucs htdemucs_6s.
+
+    Returns a dict:
+      { beathole_key: (mono_np_array_float32, display_name, sample_rate), ... }
+
+    Stems returned: drums, bass, guitar, piano, synth (=other), and vocals
+    if loud enough. Nearly-silent stems are skipped.
+    """
+    if not _DEMUCS_OK:
+        return {}
+
+    model   = _get_demucs()
+    d_sr    = model.samplerate   # 44100
+
+    # ── Load + resample to Demucs SR ─────────────────────────────────────────
+    wav, src_sr = _torchaudio.load(audio_path)
+    if src_sr != d_sr:
+        wav = _torchaudio.functional.resample(wav, src_sr, d_sr)
+
+    # Ensure stereo [2, T]
+    if wav.shape[0] == 1:
+        wav = wav.repeat(2, 1)
+    elif wav.shape[0] > 2:
+        wav = wav[:2]
+
+    wav = wav.unsqueeze(0)   # [1, 2, T]
+    if torch.cuda.is_available():
+        wav = wav.cuda()
+
+    dur_s = wav.shape[-1] / d_sr
+    print(f"[demucs] Separating {dur_s:.1f}s audio into stems...", flush=True)
+
+    with torch.no_grad():
+        sources = _demucs_apply(model, wav, progress=False)  # [1, num_stems, 2, T]
+
+    sources = sources.squeeze(0).cpu()   # [num_stems, 2, T]
+
+    result = {}
+    for i, src_name in enumerate(model.sources):
+        stem_mono = sources[i].mean(0).numpy().astype(np.float32)   # mono [T]
+        rms       = float(np.sqrt(np.mean(stem_mono ** 2)))
+        print(f"[demucs] '{src_name}' RMS={rms:.5f}", flush=True)
+
+        # Skip nearly-silent stems
+        if rms < 0.002:
+            print(f"[demucs] Skipping silent '{src_name}'", flush=True)
+            continue
+
+        bh_key, display = _DEMUCS_STEM_MAP.get(src_name, (src_name, src_name.capitalize()))
+        result[bh_key]  = (stem_mono, display, d_sr)
+        print(f"[demucs] '{src_name}' → '{bh_key}' OK", flush=True)
+
+    print(f"[demucs] Done — {len(result)} stems: {list(result.keys())}", flush=True)
+    return result
+
+
 def generate_audio_with_stems(job_input: dict) -> dict:
     """
     1. Generate the full beat with ACE-Step 1.5 text2music (coherent, properly structured).
@@ -1229,48 +1335,19 @@ def generate_audio_with_stems(job_input: dict) -> dict:
     actual_dur     = (main_audio.shape[0] if main_audio.ndim == 1 else main_audio.shape[0]) / SAMPLE_RATE
     print(f"[gen] Full beat done — shape: {main_audio.shape}, dur: {actual_dur:.1f}s", flush=True)
 
-    # ── 2. Extract each stem from the full beat (task_type="extract") ─────────
-    # ACE-Step's extract task isolates individual instruments from the mixed audio.
-    # This gives perfectly clean, bleed-free stems since they come from the beat itself.
-    # Supported ACE-Step track names for extract:
-    #   drums, bass, guitar, keyboard, percussion, strings, synth, brass, woodwinds,
-    #   vocals, backing_vocals, fx
-    # Our stem names → ACE-Step extract track name:
-    _EXTRACT_TRACK = {
-        "drums":     "drums",
-        "bass":      "bass",
-        "piano":     "keyboard",   # ACE-Step groups piano under "keyboard"
-        "keyboard":  "keyboard",
-        "guitar":    "guitar",
-        "synth":     "synth",
-        "strings":   "strings",
-        "brass":     "brass",
-        "woodwinds": "woodwinds",
-        "percs":     "percussion",
-        "vocals":    "vocals",
-    }
-
-    stems_to_gen = _stems_to_generate(genre, style, user_prompt)
-    print(f"[stems] Extracting {len(stems_to_gen)} stems: {[s for s,_ in stems_to_gen]}", flush=True)
-
-    stems_audio = {}
-    for ace_stem, display_name in stems_to_gen:
-        track_name = _EXTRACT_TRACK.get(ace_stem, ace_stem)
-        print(f"[stems] Extracting '{ace_stem}' (track='{track_name}')...", flush=True)
+    # ── 2. Separate stems with Demucs htdemucs_6s ────────────────────────────
+    # Replaces ACE-Step extract — Demucs is a proper source separator with no
+    # inter-stem bleed (no drums in synth, no piano masquerading as synth, etc.)
+    print("[stems] Separating stems with Demucs htdemucs_6s...", flush=True)
+    stems_audio = {}   # { bh_key: (mono_array, display_name, sample_rate) }
+    if _DEMUCS_OK:
         try:
-            ext_params = GenerationParams(
-                task_type   = "extract",
-                src_audio   = full_beat_path,
-                instruction = f"Extract the {track_name} track from the audio:",
-                thinking    = False,
-            )
-            # Extract uses the base model (turbo does not support extract task)
-            stem_path  = _ace_generate(dit_base, llm, ext_params, f"/tmp/bh_stem_{ace_stem}.wav")
-            stem_audio = _read_audio(stem_path)
-            stems_audio[ace_stem] = (stem_audio, display_name)
-            print(f"[stems] '{ace_stem}' extracted — shape: {stem_audio.shape}", flush=True)
+            demucs_result = separate_stems_demucs(full_beat_path)
+            stems_audio   = demucs_result
         except Exception as e:
-            print(f"[stems] '{ace_stem}' extraction FAILED: {e}", flush=True)
+            print(f"[stems] Demucs separation failed: {e}", flush=True)
+    else:
+        print("[stems] Demucs unavailable — no stems will be uploaded", flush=True)
 
     # ── 3. Upload stems to backend ────────────────────────────────────────────
     backend_url  = os.environ.get("BACKEND_URL", "").rstrip("/")
@@ -1278,15 +1355,15 @@ def generate_audio_with_stems(job_input: dict) -> dict:
     stem_urls    = {}
 
     if backend_url and internal_key and beat_id:
-        for ace_stem, (audio, _display) in stems_audio.items():
+        for bh_stem, (stem_audio, _display, d_sr) in stems_audio.items():
             try:
-                audio_down = resample_mono(audio, SAMPLE_RATE, STEM_SR)
+                audio_down = resample_mono(stem_audio, d_sr, STEM_SR)
                 b64  = np_to_wav_b64(audio_down, sr=STEM_SR)
-                url  = upload_stem(backend_url, internal_key, beat_id, ace_stem, b64)
-                stem_urls[ace_stem] = url
-                print(f"[stems] Uploaded '{ace_stem}' → {url}", flush=True)
+                url  = upload_stem(backend_url, internal_key, beat_id, bh_stem, b64)
+                stem_urls[bh_stem] = url
+                print(f"[stems] Uploaded '{bh_stem}' → {url}", flush=True)
             except Exception as e:
-                print(f"[stems] Upload failed for '{ace_stem}': {e}", flush=True)
+                print(f"[stems] Upload failed for '{bh_stem}': {e}", flush=True)
     else:
         print("[stems] Skipping upload — env vars not set", flush=True)
 
@@ -1953,33 +2030,34 @@ def generate_midi_from_audio(job_input: dict) -> dict:
     total_beats    = round(actual_dur * bpm / 60)
     print(f"[midi-gen] Beat done — {actual_dur:.1f}s", flush=True)
 
-    # ── 2. Extract pitched stems + transcribe to MIDI ─────────────────────────
-    stems_to_gen = _stems_to_generate(genre, style, prompt)
-    melodic_stems = [(s, d) for s, d in stems_to_gen if s in _MIDI_TRANSCRIBE_STEMS]
-
+    # ── 2. Separate stems with Demucs + transcribe pitched stems to MIDI ──────
+    print("[midi-gen] Separating stems with Demucs for MIDI transcription...", flush=True)
     transcribed_tracks = []
-    for ace_stem, display_name in melodic_stems:
-        track_name = _MIDI_EXTRACT_TRACK.get(ace_stem, ace_stem)
-        print(f"[midi-gen] Extracting '{ace_stem}' (track='{track_name}')...", flush=True)
+    if _DEMUCS_OK:
         try:
-            ext_params = GenerationParams(
-                task_type   = "extract",
-                src_audio   = full_beat_path,
-                instruction = f"Extract the {track_name} track from the audio:",
-                thinking    = False,
-            )
-            stem_path = _ace_generate(dit_base, llm, ext_params, f"/tmp/bh_midi_stem_{ace_stem}.wav")
-            notes = transcribe_to_midi(stem_path, bpm, ace_stem)
-            if notes:
-                inst_type = ACE_STEM_TO_STUDIO.get(ace_stem, "synth")
-                transcribed_tracks.append({
-                    "name":        display_name,
-                    "instrument":  inst_type,
-                    "notes":       notes,
-                    "total_beats": total_beats,
-                })
+            demucs_stems = separate_stems_demucs(full_beat_path)
+            # Transcribe every non-drum pitched stem with Basic Pitch
+            _MIDI_PITCH_STEMS = {"bass", "guitar", "piano", "synth"}
+            for bh_key, (stem_mono, display_name, d_sr) in demucs_stems.items():
+                if bh_key not in _MIDI_PITCH_STEMS:
+                    continue
+                # Write stem to temp WAV for Basic Pitch
+                stem_tmp = f"/tmp/bh_midi_demucs_{bh_key}.wav"
+                sf.write(stem_tmp, stem_mono, d_sr)
+                notes = transcribe_to_midi(stem_tmp, bpm, bh_key)
+                if notes:
+                    inst_type = _DEMUCS_INST_TYPE.get(bh_key, "synth")
+                    transcribed_tracks.append({
+                        "name":        display_name,
+                        "instrument":  inst_type,
+                        "notes":       notes,
+                        "total_beats": total_beats,
+                    })
+                    print(f"[midi-gen] '{bh_key}' → {len(notes)} MIDI notes", flush=True)
         except Exception as e:
-            print(f"[midi-gen] '{ace_stem}' extract/transcribe failed: {e}", flush=True)
+            print(f"[midi-gen] Demucs separation failed: {e}", flush=True)
+    else:
+        print("[midi-gen] Demucs unavailable — no MIDI transcription", flush=True)
 
     # ── 3. Hardcoded drum MIDI (Basic Pitch is a pitch detector, not drum detector) ──
     no_drums = any(x in user_p for x in ["no drums", "without drums", "drumless", "geen drums"])

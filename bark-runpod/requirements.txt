@@ -4,3 +4,6 @@ runpod==1.7.2
 # Numerics / audio
 numpy==1.26.4
 soundfile
+
+# Stem separation (replaces ACE-Step extract task)
+demucs
