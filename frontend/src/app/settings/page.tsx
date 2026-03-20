@@ -5,7 +5,7 @@ import Navbar from '@/components/Navbar'
 import { useAuthStore } from '@/store/auth'
 import { accountApi, authApi } from '@/lib/api'
 import toast from 'react-hot-toast'
-import { Settings, User, Mail, Lock, Save, Loader2, Eye, EyeOff } from 'lucide-react'
+import { Settings, User, Mail, Lock, Save, Loader2, Eye, EyeOff, Shield } from 'lucide-react'
 import clsx from 'clsx'
 
 export default function SettingsPage() {
@@ -17,12 +17,14 @@ export default function SettingsPage() {
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
   const [showPw, setShowPw] = useState({ current: false, new: false, confirm: false })
   const [saving, setSaving] = useState<string | null>(null)
+  const [twoFaEnabled, setTwoFaEnabled] = useState(false)
 
   useEffect(() => { initialize() }, [])
   useEffect(() => {
     if (!isLoading && !user) router.push('/login?redirect=/settings')
     if (user) {
       setUsernameForm({ username: user.username, displayName: user.display_name || '' })
+      setTwoFaEnabled(!!(user as any).two_fa_enabled)
     }
   }, [user, isLoading])
 
@@ -31,12 +33,11 @@ export default function SettingsPage() {
     if (!emailForm.newEmail || !emailForm.currentPassword) return toast.error('Fill in all fields')
     setSaving('email')
     try {
-      await accountApi.changeEmail(emailForm)
-      toast.success('Email updated successfully')
+      await accountApi.requestEmailChange(emailForm)
+      toast.success('A confirmation link has been sent to your current email address.')
       setEmailForm({ newEmail: '', currentPassword: '' })
-      await refresh()
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to update email')
+      toast.error(err.response?.data?.error || 'Failed to request email change')
     } finally { setSaving(null) }
   }
 
@@ -59,11 +60,23 @@ export default function SettingsPage() {
     if (passwordForm.newPassword.length < 8) return toast.error('Password must be at least 8 characters')
     setSaving('password')
     try {
-      await accountApi.changePassword(passwordForm)
-      toast.success('Password changed successfully')
+      await accountApi.requestPasswordChange(passwordForm)
+      toast.success('A confirmation link has been sent to your email address.')
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to change password')
+      toast.error(err.response?.data?.error || 'Failed to request password change')
+    } finally { setSaving(null) }
+  }
+
+  const handle2faToggle = async () => {
+    const newValue = !twoFaEnabled
+    setSaving('2fa')
+    try {
+      await accountApi.toggle2fa(newValue)
+      setTwoFaEnabled(newValue)
+      toast.success(`Two-factor authentication ${newValue ? 'enabled' : 'disabled'}`)
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to update 2FA setting')
     } finally { setSaving(null) }
   }
 
@@ -243,6 +256,40 @@ export default function SettingsPage() {
                 Change Password
               </button>
             </form>
+          </div>
+
+          {/* Two-Factor Authentication */}
+          <div className="card p-6">
+            <div className="flex items-center gap-2 mb-5">
+              <Shield size={16} className="text-forge-cyan" />
+              <h2 className="font-semibold text-forge-text">Two-Factor Authentication</h2>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex-1 mr-4">
+                <p className="text-forge-text text-sm font-medium mb-1">
+                  Email 2FA is currently <span className={twoFaEnabled ? 'text-green-400' : 'text-forge-muted'}>{twoFaEnabled ? 'enabled' : 'disabled'}</span>
+                </p>
+                <p className="text-forge-muted text-xs">When enabled, you'll receive a 6-digit code by email each time you log in.</p>
+              </div>
+              <button
+                type="button"
+                onClick={handle2faToggle}
+                disabled={saving === '2fa'}
+                className={clsx(
+                  'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none flex-shrink-0',
+                  twoFaEnabled ? 'bg-forge-accent' : 'bg-forge-border',
+                  saving === '2fa' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                )}
+                aria-label="Toggle 2FA"
+              >
+                <span
+                  className={clsx(
+                    'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                    twoFaEnabled ? 'translate-x-6' : 'translate-x-1'
+                  )}
+                />
+              </button>
+            </div>
           </div>
 
         </div>

@@ -3,7 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const { query } = require('../db');
 const { authenticate } = require('../middleware/auth');
 const stripeService = require('../services/stripe');
-const { sendBeatSoldEmail, sendBuyerReceiptEmail } = require('../services/email');
+const { sendBeatSoldEmail, sendBuyerReceiptEmail, sendCreditsReceiptEmail } = require('../services/email');
 
 const router = express.Router();
 
@@ -316,6 +316,12 @@ router.get('/credits-success', authenticate, async (req, res, next) => {
 
     // Add credits
     await query('UPDATE users SET extra_beat_credits = extra_beat_credits + ? WHERE id = ?', [parseInt(credits), req.user.id]);
+
+    try {
+      const userRes = await query('SELECT email, display_name, username FROM users WHERE id = ?', [req.user.id]);
+      const u = userRes.rows[0];
+      if (u) await sendCreditsReceiptEmail({ to: u.email, displayName: u.display_name || u.username, credits: parseInt(credits), amountCents: session.amount_total || 0 });
+    } catch (e) { console.error('Credits email failed:', e.message); }
 
     // Record as order (for audit)
     const { v4: uuidv4 } = require('uuid');

@@ -38,6 +38,11 @@ export const authApi = {
     api.post('/auth/login', data),
   me: () => api.get('/auth/me'),
   updateProfile: (data: object) => api.put('/auth/profile', data),
+  forgotPassword: (emailOrUsername: string) => api.post('/auth/forgot-password', { emailOrUsername }),
+  resetPassword: (data: { token: string; newPassword: string }) => api.post('/auth/reset-password', data),
+  confirmEmailChange: (token: string) => api.post(`/auth/confirm-email-change/${token}`, {}),
+  confirmPasswordChange: (token: string) => api.post(`/auth/confirm-password-change/${token}`, {}),
+  verify2fa: (data: { userId: string; code: string }) => api.post('/auth/2fa/verify', data),
 }
 
 // ─── Beats ───────────────────────────────────────────────────────────────────
@@ -127,6 +132,11 @@ export const accountApi = {
     api.put('/auth/change-username', data),
   changePassword: (data: { currentPassword: string; newPassword: string; confirmPassword: string }) =>
     api.put('/auth/change-password', data),
+  requestEmailChange: (data: { newEmail: string; currentPassword: string }) =>
+    api.post('/auth/request-email-change', data),
+  requestPasswordChange: (data: { currentPassword: string; newPassword: string; confirmPassword: string }) =>
+    api.post('/auth/request-password-change', data),
+  toggle2fa: (enabled: boolean) => api.post('/auth/2fa/toggle', { enabled }),
 }
 
 // ─── Support ─────────────────────────────────────────────────────────────────

@@ -28,6 +28,11 @@ function LoginContent() {
     setLoading(true)
     try {
       const res = await authApi.login(form)
+      if (res.data.requires2fa) {
+        sessionStorage.setItem('2fa_userId', res.data.userId)
+        router.push('/2fa')
+        return
+      }
       setUser(res.data.user)
       setToken(res.data.token)
       toast.success('Welcome back!')
@@ -83,6 +88,11 @@ function LoginContent() {
                 {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+          </div>
+          <div className="text-right">
+            <Link href="/forgot-password" className="text-forge-muted text-sm hover:text-forge-accent transition-colors">
+              Forgot password?
+            </Link>
           </div>
           <button type="submit" disabled={loading} className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-50">
             {loading ? <Loader2 size={16} className="animate-spin" /> : null}
