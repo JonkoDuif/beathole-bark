@@ -714,9 +714,30 @@ _FEEL_TAGS_CHILL = [
 
 _CHILL_GENRES = {"lo-fi", "ambient", "jazz", "vaporwave", "cloud rap", "deep house"}
 
-def _feel_tags_for_genre(genre: str):
+# Moods that imply dark/negative emotional tone — energy must NOT override this to happy
+_DARK_SAD_MOODS = {
+    "sad", "dark", "emotional", "lonely", "pain", "melancholic", "mysterious",
+    "angry", "nostalgic", "heavy", "depressed", "heartbreak", "grief", "gloomy",
+    "somber", "haunting", "eerie", "bitter", "hurt", "tragic",
+}
+
+# Atmospheric feel tags for dark + energetic beats — intense but emotionally heavy
+_FEEL_TAGS_DARK_ENERGY = [
+    "dark underground rage energy, heavy emotional weight with full power",
+    "menacing aggressive intensity, emotional pain channeled into pure force",
+    "cinematic dark energy, overwhelming powerful emotion, heavy hard sound",
+    "brooding relentless drive, dark minor-key intensity pushing forward hard",
+    "cold aggressive power, ominous hard-hitting momentum, dark relentless force",
+    "intense somber rage, pain-driven energy, dark powerful production",
+    "gritty dark street intensity, heavy emotional power, raw aggression",
+    "haunting powerful drive, dark orchestral energy, emotional high-impact sound",
+]
+
+def _feel_tags_for_genre(genre: str, is_dark_sad: bool = False, is_energic: bool = False):
     if genre in _CHILL_GENRES:
         return _FEEL_TAGS_CHILL
+    if is_dark_sad and is_energic:
+        return _FEEL_TAGS_DARK_ENERGY
     return _FEEL_TAGS_HIGH_ENERGY
 
 # High-energy electronic genres — use electronic section labels + higher guidance
@@ -1313,12 +1334,20 @@ _GENRE_GUIDANCE_RANGE = {
     "pop":           (8.5,  9.5),
 }
 
-# Tags injected when user specifies "energic" / "energetic" in their prompt
+# Tags injected when user specifies "energic" / "energetic" in their prompt (neutral/happy mood)
 _ENERGIC_BOOST_TAGS = [
     "maximum energy, relentless intensity, explosive powerful production",
     "full power, aggressive high-energy, overwhelming sonic force",
     "peak energy, driving relentless momentum, intense high-impact sound",
     "maximum intensity, hard-hitting explosive production, full-throttle energy",
+]
+
+# Tags injected when energic + dark/sad mood — hard/fast/intense but NOT happy, NOT uplifting
+_DARK_ENERGIC_BOOST_TAGS = [
+    "dark maximum energy, powerful but emotionally heavy, NOT uplifting, NOT happy, NOT bright, minor key, intense sorrowful force",
+    "aggressive dark power, hard-hitting and emotionally devastating, NOT major key, NOT cheerful, cold relentless intensity",
+    "heavy dark intensity, explosive emotional pain channeled into sonic force, NOT uplifting, minor key, menacing drive",
+    "dark full-throttle production, relentless heavy power, NOT happy, NOT bright, emotionally raw intensity, minor key",
 ]
 
 # Explicit instrument descriptors — injected when user mentions a specific instrument.
@@ -1628,6 +1657,11 @@ def build_tags(prompt: str, genre: str, mood: str, bpm: int, key: str) -> str:
         if kw in p_lower and kw not in m:
             detected_moods.append(kw)
 
+    # ── Detect dark/sad emotional tone ────────────────────────────────────────
+    # Check both explicit mood field and detected prompt keywords
+    all_mood_words = set([m] + detected_moods + p_lower.split())
+    is_dark_sad = bool(all_mood_words & _DARK_SAD_MOODS)
+
     # ── Genre-specific negative disambiguation tags ───────────────────────────
     # Prevent ACE-Step from drifting to "default" pop/EDM production
     _GENRE_NEGATIVE_TAGS = {
@@ -1653,9 +1687,15 @@ def build_tags(prompt: str, genre: str, mood: str, bpm: int, key: str) -> str:
     # ── Genre anchor (VERY FIRST tag — strongly anchors genre identity) ───────
     neg = _GENRE_NEGATIVE_TAGS.get(g)
     if neg:
+        # When dark/sad mood detected, append explicit anti-happy negations to genre anchor
+        if is_dark_sad:
+            neg = neg + ", NOT uplifting, NOT major key, NOT happy, NOT bright, NOT cheerful, minor key, dark emotional tone"
         parts.insert(0, neg)
     elif g:
-        parts.insert(0, f"{g} beat, {g} music production style")
+        base = f"{g} beat, {g} music production style"
+        if is_dark_sad:
+            base += ", NOT uplifting, NOT major key, NOT happy, NOT bright, minor key, dark emotional tone"
+        parts.insert(0, base)
 
     # ── Explicit instrument override ──────────────────────────────────────────
     # Sorted longest-first: "acoustic guitar" before "guitar", "dark piano" before "piano"
@@ -1698,8 +1738,13 @@ def build_tags(prompt: str, genre: str, mood: str, bpm: int, key: str) -> str:
 
     # ── "Energic" boost ───────────────────────────────────────────────────────
     if is_energic:
-        parts.append(random.choice(_ENERGIC_BOOST_TAGS))
-        parts.append("massive wall of sound, relentless high-energy arrangement, powerful full-mix impact")
+        if is_dark_sad:
+            # Dark + energic = hard/fast/intense but NOT happy — use dark-energy tags
+            parts.append(random.choice(_DARK_ENERGIC_BOOST_TAGS))
+            parts.append("massive wall of dark sound, relentless heavy-energy arrangement, powerful dark full-mix impact, minor key intensity")
+        else:
+            parts.append(random.choice(_ENERGIC_BOOST_TAGS))
+            parts.append("massive wall of sound, relentless high-energy arrangement, powerful full-mix impact")
 
     # ── Mood (explicit field) ─────────────────────────────────────────────────
     mood_variants = MOOD_VARIANTS.get(m)
@@ -1724,19 +1769,27 @@ def build_tags(prompt: str, genre: str, mood: str, bpm: int, key: str) -> str:
 
     # ── Atmospheric feel tag (80% chance, energy-appropriate) ─────────────────
     if random.random() < 0.80:
-        parts.append(random.choice(_feel_tags_for_genre(g)))
+        parts.append(random.choice(_feel_tags_for_genre(g, is_dark_sad=is_dark_sad, is_energic=is_energic)))
 
     # ── Mix fullness ──────────────────────────────────────────────────────────
     parts.append(random.choice(_FULLNESS_TAGS))
 
     # ── Base energy boost for all non-chill genres ─────────────────────────
     if g not in _CHILL_GENRES:
-        parts.append(random.choice([
-            "hard-hitting punchy production, every drum hit lands with force, powerful energetic mix",
-            "aggressive full-power mix, hard kick impact, loud punchy drums, high-energy arrangement",
-            "powerful driving production, relentless energy, strong punchy drum hits, full loud mix",
-            "energetic hard-hitting beat, powerful kick and snare punch, full-throttle driving rhythm",
-        ]))
+        if is_dark_sad:
+            parts.append(random.choice([
+                "hard-hitting dark production, every drum hit lands with force, powerful heavy mix, NOT uplifting, minor key",
+                "aggressive full-power dark mix, hard kick impact, loud punchy drums, menacing dark arrangement, NOT happy",
+                "powerful dark driving production, relentless heavy energy, strong punchy drum hits, full loud dark mix",
+                "intense hard-hitting dark beat, powerful kick and snare punch, full-throttle driving rhythm, cold and heavy",
+            ]))
+        else:
+            parts.append(random.choice([
+                "hard-hitting punchy production, every drum hit lands with force, powerful energetic mix",
+                "aggressive full-power mix, hard kick impact, loud punchy drums, high-energy arrangement",
+                "powerful driving production, relentless energy, strong punchy drum hits, full loud mix",
+                "energetic hard-hitting beat, powerful kick and snare punch, full-throttle driving rhythm",
+            ]))
 
     # ── Production texture ────────────────────────────────────────────────────
     textures = _PRODUCTION_TEXTURES.get(g, _PRODUCTION_TEXTURES["_default"])
@@ -1760,8 +1813,12 @@ def build_tags(prompt: str, genre: str, mood: str, bpm: int, key: str) -> str:
         parts.append(_GENRE_DEFAULT_BPM[g])
     if key:
         parts.append(f"key of {key}")
-    if is_energic:
+    if is_energic and is_dark_sad:
+        parts.append("dark explosive production, powerful heavy dark mix, every element hitting hard in minor key, NOT uplifting, NOT happy, emotionally devastating high-intensity sound")
+    elif is_energic:
         parts.append("explosive maximum-energy production, full loud powerful mix, every element hitting hard, peak intensity")
+    elif is_dark_sad:
+        parts.append("dark emotional studio production, minor key, NOT uplifting, NOT happy, NOT bright, deep somber mix, heavy atmosphere")
     elif g in _CHILL_GENRES:
         parts.append("full rich studio production, warm mix depth, smooth arrangement, emotionally expressive")
     else:
