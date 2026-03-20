@@ -1570,8 +1570,22 @@ export default function StudioPage() {
       setTracks(initialTracks); setSelectedTrack(initialTracks[0]?.id || null)
     }).catch(() => toast.error('Failed to load beat')).finally(() => setPageLoading(false))
 
-    const saved = localStorage.getItem('studio_presets')
-    if (saved) { try { setPresets(JSON.parse(saved)) } catch {} }
+    // Load presets from server (fall back to localStorage for offline/legacy)
+    if (user) {
+      presetsApi.list().then(r => {
+        const serverPresets = (r.data || []).map((p: any) => ({
+          id: p.id, name: p.name,
+          effects: p.data || {}
+        }))
+        setPresets(serverPresets)
+      }).catch(() => {
+        const saved = localStorage.getItem('studio_presets')
+        if (saved) { try { setPresets(JSON.parse(saved)) } catch {} }
+      })
+    } else {
+      const saved = localStorage.getItem('studio_presets')
+      if (saved) { try { setPresets(JSON.parse(saved)) } catch {} }
+    }
   }, [beatId, user, isLoading])
 
   // ── Audio context helpers ────────────────────────────────────────────────────
@@ -2348,21 +2362,25 @@ export default function StudioPage() {
     setTracks(prev => prev.map(t => t.id === trackId ? { ...t, clips: t.clips.filter(c => c.id !== clipId) } : t))
   }, [tracks, pushUndo])
 
-  const savePreset = useCallback((name: string, effects: TrackEffects) => {
+  const savePreset = useCallback(async (name: string, effects: TrackEffects) => {
     if (user?.subscription_plan !== 'pro') {
       toast.error('Saving presets requires a Pro plan. Upgrade to unlock.')
       return
     }
-    const updated = [...presets, { id: uid(), name, effects }]
-    setPresets(updated); localStorage.setItem('studio_presets', JSON.stringify(updated))
-    toast.success('Preset saved: ' + name)
-  }, [presets, user])
+    try {
+      const res = await presetsApi.save({ name, data: effects })
+      const newPreset = { id: res.data.id, name, effects }
+      setPresets(prev => [...prev, newPreset])
+      toast.success('Preset saved: ' + name)
+    } catch {
+      toast.error('Failed to save preset')
+    }
+  }, [user])
 
-  const deletePreset = useCallback((id: string) => {
-    const updated = presets.filter(p => p.id !== id)
-    setPresets(updated)
-    localStorage.setItem('studio_presets', JSON.stringify(updated))
-  }, [presets])
+  const deletePreset = useCallback(async (id: string) => {
+    setPresets(prev => prev.filter(p => p.id !== id))
+    try { await presetsApi.delete(id) } catch {}
+  }, [])
 
   // ── Save as Beat + Publish ────────────────────────────────────────────────────
   const getStudioProject = useCallback(() => {
