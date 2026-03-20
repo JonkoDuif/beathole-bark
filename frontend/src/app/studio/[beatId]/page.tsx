@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuthStore } from '@/store/auth'
 import { beatsApi, studioApi, presetsApi } from '@/lib/api'
@@ -12,7 +12,7 @@ import {
   Mic, SkipBack, ArrowLeft, Save, FileAudio,
   Settings, Check, Keyboard, Wand2, TrendingUp,
   ZoomIn, ZoomOut, RotateCcw, Plus, Timer, Minus, Globe,
-  UserPlus, Lock, Users
+  UserPlus, Lock, Users, Share2
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -50,6 +50,16 @@ interface TrackEffects {
   // Per-effect enabled toggles
   eqEnabled: boolean; reverbEnabled: boolean; delayEnabled: boolean
   compEnabled: boolean; autotuneEnabled: boolean
+  chorusRate: number      // 0.1–8 Hz LFO rate
+  chorusDepth: number     // 0–30 ms modulation depth
+  chorusEnabled: boolean
+  distortion: number      // 0–1 drive amount
+  distortionEnabled: boolean
+  stereoWidth: number     // 0–2 (1 = normal, 2 = double width)
+  stereoWidthEnabled: boolean
+  tremoloRate: number     // 0.1–20 Hz
+  tremoloDepth: number    // 0–1 amplitude modulation depth
+  tremoloEnabled: boolean
 }
 interface Track {
   id: string; type: 'beat'|'audio'|'midi'|'vocal'; name: string; color: string
@@ -66,6 +76,9 @@ interface TrackGraph {
   reverbConv: ConvolverNode; reverbGain: GainNode; dryGain: GainNode
   delayNode: DelayNode; delayFb: GainNode; delayWet: GainNode
   volGain: GainNode; panner: StereoPannerNode
+  distortionNode: WaveShaperNode
+  tremoloGain: GainNode
+  tremoloOsc: OscillatorNode
 }
 
 const DEFAULT_EQ_BANDS: EQBand[] = [
@@ -84,6 +97,10 @@ const DEFAULT_FX: TrackEffects = {
   autotuneStrength: 0.8, compThreshold: -24, compRatio: 4,
   eqEnabled: true, reverbEnabled: true, delayEnabled: true,
   compEnabled: true, autotuneEnabled: true,
+  chorusRate: 1.5, chorusDepth: 5, chorusEnabled: false,
+  distortion: 0, distortionEnabled: false,
+  stereoWidth: 1, stereoWidthEnabled: false,
+  tremoloRate: 4, tremoloDepth: 0, tremoloEnabled: false,
 }
 const VOCAL_PRESET: TrackEffects = { ...DEFAULT_FX, reverbWet: 0.3, compThreshold: -30, compRatio: 6, autotuneKey: 'C', autotuneStrength: 0.85 }
 const TRAP_PRESET:  TrackEffects = { ...DEFAULT_FX, reverbWet: 0.15, delayTime: 0.25, delayFeedback: 0.3, lowGain: 3, highGain: 2 }
@@ -191,13 +208,39 @@ function buildTrackGraph(ctx: AudioContext, fx: TrackEffects, volume: number, pa
   const volGain    = ctx.createGain(); volGain.gain.value    = volume
   const panner     = ctx.createStereoPanner(); panner.pan.value = pan
 
-  input.connect(eqIn); eqOut.connect(comp)
+  // Distortion — waveshaper before comp
+  const distortionNode = ctx.createWaveShaper()
+  function makeDistortionCurve(amount: number): Float32Array<ArrayBuffer> {
+    const n = 256
+    const curve = new Float32Array(new ArrayBuffer(n * 4))
+    const k = amount * 200
+    for (let i = 0; i < n; i++) {
+      const x = (i * 2) / n - 1
+      curve[i] = k > 0 ? ((Math.PI + k) * x) / (Math.PI + k * Math.abs(x)) : x
+    }
+    return curve
+  }
+  distortionNode.curve = fx.distortionEnabled && fx.distortion > 0
+    ? makeDistortionCurve(fx.distortion)
+    : null
+
+  // Tremolo — amplitude LFO after volume
+  const tremoloOsc = ctx.createOscillator()
+  const tremoloGain = ctx.createGain()
+  tremoloOsc.type = 'sine'
+  tremoloOsc.frequency.value = fx.tremoloRate
+  tremoloGain.gain.value = fx.tremoloEnabled && fx.tremoloDepth > 0 ? fx.tremoloDepth : 0
+  tremoloOsc.connect(tremoloGain)
+  tremoloGain.connect(volGain.gain)  // modulate volume gain
+  tremoloOsc.start()
+
+  input.connect(distortionNode); distortionNode.connect(eqIn); eqOut.connect(comp)
   comp.connect(dryGain); dryGain.connect(volGain)
   comp.connect(reverbConv); reverbConv.connect(reverbGain); reverbGain.connect(volGain)
   comp.connect(delayNode); delayNode.connect(delayFb); delayFb.connect(delayNode); delayFb.connect(delayWet); delayWet.connect(volGain)
   volGain.connect(panner)
 
-  return { input, output: panner, eqNodes, comp, reverbConv, reverbGain, dryGain, delayNode, delayFb, delayWet, volGain, panner }
+  return { input, output: panner, eqNodes, comp, reverbConv, reverbGain, dryGain, delayNode, delayFb, delayWet, volGain, panner, distortionNode, tremoloGain, tremoloOsc }
 }
 
 function updateTrackGraph(graph: TrackGraph, track: Track) {
@@ -220,6 +263,18 @@ function updateTrackGraph(graph: TrackGraph, track: Track) {
   graph.delayWet.gain.value    = (fx.delayEnabled && fx.delayTime > 0) ? 0.4 : 0
   graph.volGain.gain.value     = track.muted ? 0 : track.volume
   graph.panner.pan.value       = track.pan
+  // Distortion update
+  if (fx.distortionEnabled && fx.distortion > 0) {
+    const n = 256, k = fx.distortion * 200
+    const curve = new Float32Array(new ArrayBuffer(n * 4))
+    for (let i = 0; i < n; i++) { const x = (i * 2) / n - 1; curve[i] = ((Math.PI + k) * x) / (Math.PI + k * Math.abs(x)) }
+    graph.distortionNode.curve = curve
+  } else {
+    graph.distortionNode.curve = null
+  }
+  // Tremolo update
+  graph.tremoloOsc.frequency.value = fx.tremoloRate
+  graph.tremoloGain.gain.value = fx.tremoloEnabled ? fx.tremoloDepth : 0
 }
 
 // For offline export (OfflineAudioContext)
@@ -1109,6 +1164,66 @@ function EffectsPanel({ track, onChange, presets, onSavePreset, onLoadPreset, on
                   format={v => (v>0?'+':'')+v+' st'} onChange={v => set('pitchShift',v)} />
               </div>
             </div>
+
+            {/* Distortion */}
+            <div className={clsx("bg-forge-black/30 rounded-xl p-3 space-y-2 transition-opacity", !fx.distortionEnabled && "opacity-50")}>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-forge-muted font-medium">Distortion</span>
+                  <button onClick={() => onChange({ ...fx, distortionEnabled: !fx.distortionEnabled })}
+                    className={`text-xs px-2 py-0.5 rounded ${fx.distortionEnabled ? 'bg-forge-orange/20 text-forge-orange' : 'bg-forge-black text-forge-muted'}`}>
+                    {fx.distortionEnabled ? 'ON' : 'OFF'}
+                  </button>
+                </div>
+                {fx.distortionEnabled && (
+                  <input type="range" min={0} max={1} step={0.01} value={fx.distortion}
+                    onChange={e => onChange({ ...fx, distortion: parseFloat(e.target.value) })}
+                    className="w-full accent-forge-orange" />
+                )}
+              </div>
+            </div>
+
+            {/* Chorus */}
+            <div className={clsx("bg-forge-black/30 rounded-xl p-3 space-y-2 transition-opacity", !fx.chorusEnabled && "opacity-50")}>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-forge-muted font-medium">Chorus</span>
+                  <button onClick={() => onChange({ ...fx, chorusEnabled: !fx.chorusEnabled })}
+                    className={`text-xs px-2 py-0.5 rounded ${fx.chorusEnabled ? 'bg-forge-orange/20 text-forge-orange' : 'bg-forge-black text-forge-muted'}`}>
+                    {fx.chorusEnabled ? 'ON' : 'OFF'}
+                  </button>
+                </div>
+                {fx.chorusEnabled && (<>
+                  <div className="flex justify-between text-xs text-forge-muted"><span>Rate</span><span>{fx.chorusRate?.toFixed(1)} Hz</span></div>
+                  <input type="range" min={0.1} max={8} step={0.1} value={fx.chorusRate ?? 1.5}
+                    onChange={e => onChange({ ...fx, chorusRate: parseFloat(e.target.value) })} className="w-full accent-forge-orange" />
+                  <div className="flex justify-between text-xs text-forge-muted"><span>Depth</span><span>{fx.chorusDepth?.toFixed(0)} ms</span></div>
+                  <input type="range" min={0} max={30} step={1} value={fx.chorusDepth ?? 5}
+                    onChange={e => onChange({ ...fx, chorusDepth: parseFloat(e.target.value) })} className="w-full accent-forge-orange" />
+                </>)}
+              </div>
+            </div>
+
+            {/* Tremolo */}
+            <div className={clsx("bg-forge-black/30 rounded-xl p-3 space-y-2 transition-opacity", !fx.tremoloEnabled && "opacity-50")}>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-forge-muted font-medium">Tremolo</span>
+                  <button onClick={() => onChange({ ...fx, tremoloEnabled: !fx.tremoloEnabled })}
+                    className={`text-xs px-2 py-0.5 rounded ${fx.tremoloEnabled ? 'bg-forge-orange/20 text-forge-orange' : 'bg-forge-black text-forge-muted'}`}>
+                    {fx.tremoloEnabled ? 'ON' : 'OFF'}
+                  </button>
+                </div>
+                {fx.tremoloEnabled && (<>
+                  <div className="flex justify-between text-xs text-forge-muted"><span>Rate</span><span>{fx.tremoloRate?.toFixed(1)} Hz</span></div>
+                  <input type="range" min={0.1} max={20} step={0.1} value={fx.tremoloRate ?? 4}
+                    onChange={e => onChange({ ...fx, tremoloRate: parseFloat(e.target.value) })} className="w-full accent-forge-orange" />
+                  <div className="flex justify-between text-xs text-forge-muted"><span>Depth</span><span>{Math.round((fx.tremoloDepth ?? 0) * 100)}%</span></div>
+                  <input type="range" min={0} max={1} step={0.01} value={fx.tremoloDepth ?? 0}
+                    onChange={e => onChange({ ...fx, tremoloDepth: parseFloat(e.target.value) })} className="w-full accent-forge-orange" />
+                </>)}
+              </div>
+            </div>
           </>
         ) : (
           <div className="relative">
@@ -1128,6 +1243,22 @@ function EffectsPanel({ track, onChange, presets, onSavePreset, onLoadPreset, on
                 <div key={p.id} className="flex items-center gap-2 p-3 rounded-xl bg-forge-black/40 border border-forge-border hover:border-forge-accent/40 transition-colors">
                   <span className="text-sm text-forge-text flex-1 font-medium">{p.name}</span>
                   <button onClick={() => onLoadPreset(p.effects)} className="text-xs font-semibold text-forge-accent hover:text-forge-accent/80 px-2 py-1 rounded-lg bg-forge-accent/10 hover:bg-forge-accent/20 transition-colors">Load</button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await presetsApi.share(p.id)
+                        const shareUrl = `${window.location.origin}/presets/share/${res.data.token}`
+                        navigator.clipboard?.writeText(shareUrl)
+                        toast.success('Share link copied!')
+                      } catch {
+                        toast.error('Failed to share preset')
+                      }
+                    }}
+                    className="p-1 text-forge-muted hover:text-forge-cyan transition-colors"
+                    title="Share preset"
+                  >
+                    <Share2 size={12} />
+                  </button>
                   <button onClick={() => onDeletePreset(p.id)} className="p-1 text-forge-muted hover:text-red-400 transition-colors" title="Delete preset"><X size={12} /></button>
                 </div>
               ))}
@@ -1209,6 +1340,7 @@ function LiveRecordingWave({
 export default function StudioPage() {
   const { beatId } = useParams<{ beatId: string }>()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, isLoading } = useAuthStore()
 
   const [beat, setBeat]                 = useState<any>(null)
@@ -1313,6 +1445,23 @@ export default function StudioPage() {
       setBeat(b); setBpm(b.bpm || 120)
       const audioUrl = b.wav_url || b.mp3_url || b.preview_url
 
+      const versionId = searchParams?.get('version')
+      if (versionId) {
+        // Load specific version — skip localStorage, restore from server version snapshot
+        studioApi.getVersion(beatId, versionId).then(vRes => {
+          const pd = vRes.data?.project_data
+          if (pd) {
+            const vTracks = (pd.tracks || []).map((t: any) => ({ ...t, audioBlob: undefined, armed: t.armed ?? false }))
+            if (initialTrackCountRef.current === -1) initialTrackCountRef.current = vTracks.length
+            setTracks(vTracks)
+            setBpm(pd.bpm || b.bpm || 120)
+            setSelectedTrack(vTracks[0]?.id || null)
+            toast.success(`Loaded version v${vRes.data.version_number}`)
+          }
+        }).catch(() => toast.error('Failed to load version')).finally(() => setPageLoading(false))
+        return
+      }
+
       const saved = localStorage.getItem(`studio_project_${beatId}`)
       if (saved) {
         try {
@@ -1331,12 +1480,16 @@ export default function StudioPage() {
       const serverProject = b.studio_project
         ? (typeof b.studio_project === 'string' ? JSON.parse(b.studio_project) : b.studio_project)
         : null
-      if (serverProject && Array.isArray(serverProject) && serverProject.length > 0) {
-        const serverTracks = serverProject.map((t: any) => ({ ...t, audioBlob: undefined, armed: t.armed ?? false }))
-        if (initialTrackCountRef.current === -1) initialTrackCountRef.current = serverTracks.length
-        setTracks(serverTracks)
-        setBpm(b.bpm || 120)
-        setSelectedTrack(serverProject[0]?.id || null)
+
+      // Handle both { tracks: [...] } format and bare [] format
+      const serverTracks = serverProject?.tracks ?? (Array.isArray(serverProject) ? serverProject : null)
+      if (serverTracks && serverTracks.length > 0) {
+        const loadedTracks = serverTracks.map((t: any) => ({ ...t, audioBlob: undefined, armed: t.armed ?? false }))
+        if (initialTrackCountRef.current === -1) initialTrackCountRef.current = loadedTracks.length
+        setTracks(loadedTracks)
+        setBpm(serverProject?.bpm || b.bpm || 120)
+        setSelectedTrack(loadedTracks[0]?.id || null)
+        setPageLoading(false)
         return
       }
 
@@ -1607,8 +1760,12 @@ export default function StudioPage() {
 
         const src = ctx.createBufferSource()
         src.buffer = buf
-        // Apply pitch shift + autotune
+        // Apply pitch shift + autotune as detune (cents)
         {
+          const fx = track.effects
+          if (fx.autotuneEnabled && fx.autotuneKey !== 'none' && fx.pitchShift !== undefined) {
+            src.detune.value = (fx.pitchShift || 0) * 100  // pitchShift in semitones → cents
+          }
           let detuneValue = track.effects.pitchShift * 100
           if (track.effects.autotuneEnabled && track.effects.autotuneKey !== 'none' && track.effects.autotuneStrength > 0) {
             const hz = detectPitch(buf)
