@@ -1570,14 +1570,35 @@ export default function StudioPage() {
       setTracks(initialTracks); setSelectedTrack(initialTracks[0]?.id || null)
     }).catch(() => toast.error('Failed to load beat')).finally(() => setPageLoading(false))
 
-    // Load presets from server (fall back to localStorage for offline/legacy)
+    // Load presets from server; migrate old localStorage presets if server is empty
     if (user) {
-      presetsApi.list().then(r => {
+      presetsApi.list().then(async r => {
         const serverPresets = (r.data || []).map((p: any) => ({
-          id: p.id, name: p.name,
-          effects: p.data || {}
+          id: p.id, name: p.name, effects: p.data || {}
         }))
-        setPresets(serverPresets)
+        if (serverPresets.length > 0) {
+          setPresets(serverPresets)
+          localStorage.removeItem('studio_presets')
+        } else {
+          // Migrate old localStorage presets to server
+          const saved = localStorage.getItem('studio_presets')
+          if (saved) {
+            try {
+              const local: Preset[] = JSON.parse(saved)
+              if (local.length > 0) {
+                const migrated: Preset[] = []
+                for (const p of local) {
+                  try {
+                    const res = await presetsApi.save({ name: p.name, data: p.effects })
+                    migrated.push({ id: res.data.id, name: p.name, effects: p.effects })
+                  } catch {}
+                }
+                setPresets(migrated)
+                localStorage.removeItem('studio_presets')
+              }
+            } catch {}
+          }
+        }
       }).catch(() => {
         const saved = localStorage.getItem('studio_presets')
         if (saved) { try { setPresets(JSON.parse(saved)) } catch {} }
