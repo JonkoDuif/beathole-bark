@@ -2669,12 +2669,9 @@ export default function StudioPage() {
           <Save size={12} /> Save
         </button>
         <button onClick={handleExport} disabled={exporting}
-          className={clsx(
-            'py-1.5 px-4 text-sm flex items-center gap-2 disabled:opacity-50',
-            user?.subscription_plan === 'pro' ? 'btn-primary' : 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-forge-black border border-forge-border text-forge-muted hover:text-forge-accent text-xs transition-colors'
-          )}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-forge-black border border-forge-border text-forge-muted hover:text-forge-accent text-xs transition-colors disabled:opacity-50"
           title={user?.subscription_plan === 'pro' ? 'Export WAV (Ctrl+E)' : 'WAV Export — Pro only'}>
-          {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+          {exporting ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
           Export WAV {user?.subscription_plan !== 'pro' && <span className="text-[9px] border border-forge-gold/50 text-forge-gold px-1 rounded">PRO</span>}
         </button>
         <button

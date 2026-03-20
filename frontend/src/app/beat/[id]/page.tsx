@@ -120,12 +120,24 @@ export default function BeatPage() {
                         @{beat.creator_username}
                       </span>
                     </p>
+                    {(() => {
+                      try {
+                        const ai = typeof beat.ai_prompt === 'string' ? JSON.parse(beat.ai_prompt) : beat.ai_prompt
+                        const promptText = ai?.prompt
+                        if (!promptText) return null
+                        return (
+                          <p className="text-forge-muted/60 text-xs mt-1.5 leading-relaxed line-clamp-2" title={promptText}>
+                            {promptText}
+                          </p>
+                        )
+                      } catch { return null }
+                    })()}
                   </div>
                 </div>
 
                 {/* Tags row */}
                 <div className="flex flex-wrap gap-2 mb-6">
-                  <span className="badge-accent">{beat.genre}</span>
+                  <span className="badge-accent max-w-[200px] truncate" title={beat.genre}>{beat.genre}</span>
                   {beat.mood && <span className="badge bg-forge-dark border border-forge-border text-forge-muted">{beat.mood}</span>}
                   {beat.bpm && (
                     <span className="badge bg-forge-dark border border-forge-border text-forge-muted">
