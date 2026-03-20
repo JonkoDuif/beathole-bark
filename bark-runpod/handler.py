@@ -688,14 +688,36 @@ _PRODUCTION_TEXTURES = {
 }
 
 # Atmospheric feel tags — added randomly to give ACE-Step creative direction
-_FEEL_TAGS = [
-    "late night 3am energy", "empty city streets", "rain on the window",
-    "introspective inner thoughts", "staring at the ceiling", "driving alone at night",
-    "neon lights and fog", "cold winter silence", "summer heat haze",
-    "headphone listening music", "bedroom studio intimacy", "underground club basement",
-    "rooftop sunset session", "cinematic storytelling", "raw emotional honesty",
-    "street corner atmosphere", "luxury late night", "spiritual transcendence",
+_FEEL_TAGS_HIGH_ENERGY = [
+    "peak-hour crowd energy, packed dancefloor momentum",
+    "explosive concert energy, live performance power",
+    "adrenaline-pumping high-speed intensity, non-stop drive",
+    "underground club banger, dark room bass pressure",
+    "full-throttle production, relentless forward momentum",
+    "hard-hitting street energy, raw urban power",
+    "stadium anthem energy, massive crowd impact",
+    "club ready drop energy, maximum dancefloor force",
+    "driving hard rhythm pushing the listener forward",
+    "high-impact aggressive production, hard and heavy sound",
+    "relentless beat, powerful driving rhythm, full intensity",
+    "punchy hard production, every hit lands with force",
 ]
+
+_FEEL_TAGS_CHILL = [
+    "late night 3am energy", "rain on the window",
+    "introspective inner thoughts", "driving alone at night",
+    "neon lights and fog", "headphone listening music",
+    "bedroom studio intimacy", "rooftop sunset session",
+    "cinematic storytelling", "raw emotional honesty",
+    "luxury late night", "spiritual transcendence",
+]
+
+_CHILL_GENRES = {"lo-fi", "ambient", "jazz", "vaporwave", "cloud rap", "deep house"}
+
+def _feel_tags_for_genre(genre: str):
+    if genre in _CHILL_GENRES:
+        return _FEEL_TAGS_CHILL
+    return _FEEL_TAGS_HIGH_ENERGY
 
 # High-energy electronic genres — use electronic section labels + higher guidance
 _ELECTRONIC_GENRES = {
@@ -704,16 +726,16 @@ _ELECTRONIC_GENRES = {
     "grime", "uk garage",
 }
 
-# Mix fullness tags — always injected to push ACE-Step toward richer arrangements
+# Mix fullness tags — always injected to push ACE-Step toward richer, harder arrangements
 _FULLNESS_TAGS = [
-    "multiple layered instruments, full rich arrangement, every frequency filled",
-    "dense layered production, bass, mid, and high elements all present, no empty space",
-    "full arrangement with drums, bass, melody, and atmosphere all active simultaneously",
-    "richly layered mix, sub bass, mid bass, synth leads, pads, and percussion all present",
-    "full-bodied production, powerful kick, deep bass, melodic layers, textured atmosphere",
-    "packed arrangement, multiple simultaneous instrument layers, full frequency spectrum",
-    "dense energetic mix, driving rhythm section with melodic and harmonic layers on top",
-    "full production with prominent drums, deep bass groove, lead melody, and supporting pads",
+    "multiple hard-hitting layered instruments, full powerful arrangement, every frequency filled with energy",
+    "dense aggressive layered production, punchy bass, loud mid-range elements, bright highs, no empty space",
+    "full hard-hitting arrangement with loud drums, deep bass, prominent melody, rich atmosphere all pushing forward",
+    "richly layered loud mix, thunderous sub bass, punchy mid bass, cutting synth leads, full powerful spectrum",
+    "full-bodied hard production, punchy powerful kick, deep distorted bass, energetic melodic layers, full impact",
+    "packed high-energy arrangement, multiple simultaneous heavy instrument layers, maximum full frequency impact",
+    "dense driving energetic mix, powerful driving rhythm section with loud melodic and harmonic layers on top",
+    "full powerful production with prominent hard drums, deep punchy bass groove, cutting lead melody, full impact",
 ]
 
 # ── Genre-specific drum tags — ALWAYS injected so ACE-Step never forgets the rhythm ──
@@ -1243,52 +1265,52 @@ _GENRE_GUIDANCE_RANGE = {
     "dubstep":       (9.5, 10.0),
     "drum and bass": (9.5, 10.0),
     "dnb":           (9.5, 10.0),
-    "jungle":        (9.0, 10.0),
+    "jungle":        (9.5, 10.0),
     "techno":        (9.5, 10.0),
-    "tech house":    (9.0, 10.0),
+    "tech house":    (9.5, 10.0),
     "edm":           (9.5, 10.0),
-    "house":         (9.0, 10.0),
-    "deep house":    (8.5,  9.5),
-    "electronic":    (9.0, 10.0),
+    "house":         (9.5, 10.0),
+    "deep house":    (9.0,  9.5),
+    "electronic":    (9.5, 10.0),
     "hyperpop":      (9.5, 10.0),
-    "jersey club":   (9.0, 10.0),
-    "uk garage":     (8.5,  9.5),
-    "grime":         (9.0, 10.0),
+    "jersey club":   (9.5, 10.0),
+    "uk garage":     (9.0,  9.5),
+    "grime":         (9.5, 10.0),
     # ── Synthwave / retro ──────────────────────────────────────────────────
-    "synthwave":     (8.5,  9.5),
-    "vaporwave":     (7.5,  8.5),
+    "synthwave":     (9.0,  9.5),
+    "vaporwave":     (8.0,  9.0),
     # ── Hip-hop / rap ──────────────────────────────────────────────────────
     "trap":          (9.5, 10.0),
-    "drill":         (9.0, 10.0),
-    "hip hop":       (8.0,  9.0),
-    "hip-hop":       (8.0,  9.0),
-    "rap":           (8.0,  9.0),
-    "boom bap":      (8.0,  9.0),
-    "phonk":         (9.0, 10.0),
-    "cloud rap":     (7.5,  8.5),
-    "pluggnb":       (7.5,  8.5),
+    "drill":         (9.5, 10.0),
+    "hip hop":       (9.0, 10.0),
+    "hip-hop":       (9.0, 10.0),
+    "rap":           (9.0, 10.0),
+    "boom bap":      (9.0, 10.0),
+    "phonk":         (9.5, 10.0),
+    "cloud rap":     (8.0,  9.0),
+    "pluggnb":       (8.0,  9.0),
     # ── R&B / Soul / Funk ──────────────────────────────────────────────────
-    "r&b":           (8.0,  9.0),
-    "soul":          (8.0,  9.0),
-    "funk":          (8.5,  9.5),
-    "gospel":        (8.5,  9.5),
+    "r&b":           (8.5,  9.5),
+    "soul":          (8.5,  9.5),
+    "funk":          (9.0,  9.5),
+    "gospel":        (9.0,  9.5),
     # ── Afro / Caribbean / Latin ───────────────────────────────────────────
-    "afrobeats":     (8.5,  9.5),
-    "dancehall":     (8.5,  9.5),
-    "reggaeton":     (8.5,  9.5),
-    "reggae":        (8.0,  9.0),
-    "latin":         (8.5,  9.5),
+    "afrobeats":     (9.0,  9.5),
+    "dancehall":     (9.0,  9.5),
+    "reggaeton":     (9.0,  9.5),
+    "reggae":        (8.5,  9.0),
+    "latin":         (9.0,  9.5),
     # ── Live instruments ───────────────────────────────────────────────────
-    "rock":          (9.0, 10.0),
+    "rock":          (9.5, 10.0),
     "metal":         (9.5, 10.0),
-    "blues":         (8.0,  9.0),
-    "jazz":          (7.5,  8.5),
+    "blues":         (8.5,  9.5),
+    "jazz":          (8.0,  9.0),
     # ── Atmospheric / chill ────────────────────────────────────────────────
     "lo-fi":         (7.0,  8.0),
     "ambient":       (6.5,  7.5),
-    "cinematic":     (8.0,  9.0),
+    "cinematic":     (8.5,  9.5),
     # ── Pop ────────────────────────────────────────────────────────────────
-    "pop":           (8.0,  9.0),
+    "pop":           (8.5,  9.5),
 }
 
 # Tags injected when user specifies "energic" / "energetic" in their prompt
@@ -1606,9 +1628,36 @@ def build_tags(prompt: str, genre: str, mood: str, bpm: int, key: str) -> str:
         if kw in p_lower and kw not in m:
             detected_moods.append(kw)
 
+    # ── Genre-specific negative disambiguation tags ───────────────────────────
+    # Prevent ACE-Step from drifting to "default" pop/EDM production
+    _GENRE_NEGATIVE_TAGS = {
+        "trap":    "trap beat, hip hop street production, NOT pop, NOT EDM, NOT electronic dance, NOT soft",
+        "drill":   "drill beat, dark cold drill, NOT pop, NOT trap, NOT EDM, NOT soft",
+        "hip hop": "hip hop beat, rap production, NOT pop, NOT EDM, NOT R&B smooth",
+        "hip-hop": "hip hop beat, rap production, NOT pop, NOT EDM, NOT R&B smooth",
+        "boom bap": "boom bap hip hop, raw underground rap, NOT pop, NOT trap, NOT EDM",
+        "phonk":   "phonk beat, Memphis phonk production, cowbell driven, NOT pop, NOT EDM",
+        "rap":     "rap beat, hip hop production, NOT pop, NOT EDM",
+        "techno":  "techno beat, industrial mechanical dance, NOT pop, NOT trance, NOT melodic EDM",
+        "tech house": "tech house groove, underground club beat, NOT pop, NOT trance",
+        "dubstep": "dubstep bass music, heavy bass wobble drop, NOT pop, NOT melodic EDM",
+        "rock":    "rock music, live guitar drums, NOT pop, NOT electronic",
+        "metal":   "metal music, aggressive guitar, NOT pop, NOT electronic",
+        "jazz":    "jazz music, live instruments swing, NOT pop, NOT electronic",
+        "lo-fi":   "lo-fi hip hop, chill relaxed beat, NOT aggressive, NOT loud",
+        "ambient": "ambient music, atmospheric texture, NOT drums, NOT beat-driven",
+    }
+
     parts = []
 
-    # ── Explicit instrument override (FIRST so ACE-Step can't ignore it) ─────
+    # ── Genre anchor (VERY FIRST tag — strongly anchors genre identity) ───────
+    neg = _GENRE_NEGATIVE_TAGS.get(g)
+    if neg:
+        parts.insert(0, neg)
+    elif g:
+        parts.insert(0, f"{g} beat, {g} music production style")
+
+    # ── Explicit instrument override ──────────────────────────────────────────
     # Sorted longest-first: "acoustic guitar" before "guitar", "dark piano" before "piano"
     for kw in sorted(_INSTRUMENT_FORCE_TAGS.keys(), key=len, reverse=True):
         if kw in p_lower:
@@ -1673,19 +1722,30 @@ def build_tags(prompt: str, genre: str, mood: str, bpm: int, key: str) -> str:
     if prompt:
         parts.append(prompt)
 
-    # ── Atmospheric feel tag (60% chance) ─────────────────────────────────────
-    if random.random() < 0.60:
-        parts.append(random.choice(_FEEL_TAGS))
+    # ── Atmospheric feel tag (80% chance, energy-appropriate) ─────────────────
+    if random.random() < 0.80:
+        parts.append(random.choice(_feel_tags_for_genre(g)))
 
     # ── Mix fullness ──────────────────────────────────────────────────────────
     parts.append(random.choice(_FULLNESS_TAGS))
+
+    # ── Base energy boost for all non-chill genres ─────────────────────────
+    if g not in _CHILL_GENRES:
+        parts.append(random.choice([
+            "hard-hitting punchy production, every drum hit lands with force, powerful energetic mix",
+            "aggressive full-power mix, hard kick impact, loud punchy drums, high-energy arrangement",
+            "powerful driving production, relentless energy, strong punchy drum hits, full loud mix",
+            "energetic hard-hitting beat, powerful kick and snare punch, full-throttle driving rhythm",
+        ]))
 
     # ── Production texture ────────────────────────────────────────────────────
     textures = _PRODUCTION_TEXTURES.get(g, _PRODUCTION_TEXTURES["_default"])
     parts.append(random.choice(textures))
 
-    # ── Production technique ──────────────────────────────────────────────────
-    parts.append(random.choice(_PRODUCTION_TECHNIQUES))
+    # ── Production technique (filter lo-fi techniques for energetic genres) ──
+    _energetic_techniques = [t for t in _PRODUCTION_TECHNIQUES
+                              if g not in _CHILL_GENRES or "lo-fi" not in t.lower()]
+    parts.append(random.choice(_energetic_techniques if _energetic_techniques else _PRODUCTION_TECHNIQUES))
 
     # ── Harmonic color (40% chance) ───────────────────────────────────────────
     if random.random() < 0.40:
@@ -1701,11 +1761,11 @@ def build_tags(prompt: str, genre: str, mood: str, bpm: int, key: str) -> str:
     if key:
         parts.append(f"key of {key}")
     if is_energic:
-        parts.append("explosive high-energy production, full powerful mix, maximum impact and intensity")
-    elif g in _ELECTRONIC_GENRES:
-        parts.append("full energetic production, powerful mix, rich layered arrangement, high impact")
+        parts.append("explosive maximum-energy production, full loud powerful mix, every element hitting hard, peak intensity")
+    elif g in _CHILL_GENRES:
+        parts.append("full rich studio production, warm mix depth, smooth arrangement, emotionally expressive")
     else:
-        parts.append("full energetic studio production, rich mix depth, powerful arrangement, emotionally expressive")
+        parts.append("high-energy studio production, loud powerful mix, hard-hitting drums and bass, full aggressive arrangement")
 
     # ── Deduplicate preserving order ──────────────────────────────────────────
     seen, out = set(), []
@@ -1805,39 +1865,95 @@ def _build_lyrics_structure(duration: float, user_prompt: str = "", genre: str =
         secs = random.choice(pool)
         return "\n[inst]\n".join(secs) + "\n[inst]"
 
+    # Detect genre category for structure selection
+    _HH_GENRES = {"trap", "drill", "hip hop", "hip-hop", "rap", "boom bap", "phonk",
+                  "cloud rap", "pluggnb", "grime", "uk garage"}
+    _is_hh = g in _HH_GENRES
+
     # ── Random structure pool by duration (non-electronic) ───────────────────
-    # Each entry is a list of section tags; pick one randomly.
-    if duration <= 90:
-        pool = [
-            ["[intro]", "[verse]", "[chorus]", "[outro]"],
-            ["[verse]", "[chorus]", "[verse]", "[outro]"],
-            ["[intro]", "[chorus]", "[verse]", "[chorus]"],
-        ]
-    elif duration <= 130:
-        pool = [
-            ["[intro]", "[verse]", "[chorus]", "[verse]", "[outro]"],
-            ["[intro]", "[verse]", "[pre-chorus]", "[chorus]", "[verse]", "[outro]"],
-            ["[intro]", "[chorus]", "[verse]", "[chorus]", "[bridge]", "[outro]"],
-            ["[verse]", "[chorus]", "[verse]", "[chorus]", "[outro]"],
-            ["[intro]", "[verse]", "[verse]", "[chorus]", "[chorus]", "[outro]"],
-        ]
-    elif duration <= 180:
-        pool = [
-            ["[intro]", "[verse]", "[pre-chorus]", "[chorus]", "[verse]", "[chorus]", "[outro]"],
-            ["[intro]", "[verse]", "[chorus]", "[verse]", "[chorus]", "[bridge]", "[outro]"],
-            ["[intro]", "[chorus]", "[verse]", "[pre-chorus]", "[chorus]", "[bridge]", "[chorus]", "[outro]"],
-            ["[intro]", "[verse]", "[chorus]", "[verse]", "[pre-chorus]", "[chorus]", "[outro]"],
-            ["[intro]", "[verse]", "[verse]", "[chorus]", "[bridge]", "[chorus]", "[outro]"],
-            ["[intro]", "[pre-chorus]", "[chorus]", "[verse]", "[chorus]", "[bridge]", "[outro]"],
-        ]
+    # Hip-hop uses [hook] instead of [chorus] for authenticity
+    if _is_hh:
+        if duration <= 90:
+            pool = [
+                ["[intro]", "[verse]", "[hook]", "[outro]"],
+                ["[verse]", "[hook]", "[verse]", "[outro]"],
+                ["[hook]", "[verse]", "[hook]", "[outro]"],
+                ["[verse]", "[verse]", "[hook]", "[outro]"],
+                ["[intro]", "[hook]", "[verse]", "[outro]"],
+            ]
+        elif duration <= 130:
+            pool = [
+                ["[verse]", "[hook]", "[verse]", "[hook]", "[outro]"],
+                ["[intro]", "[verse]", "[hook]", "[bridge]", "[hook]"],
+                ["[hook]", "[verse]", "[hook]", "[verse]", "[outro]"],
+                ["[intro]", "[verse]", "[verse]", "[hook]", "[outro]"],
+                ["[verse]", "[hook]", "[bridge]", "[verse]", "[hook]"],
+                ["[intro]", "[hook]", "[verse]", "[hook]", "[outro]"],
+                ["[verse]", "[verse]", "[hook]", "[bridge]", "[outro]"],
+            ]
+        elif duration <= 180:
+            pool = [
+                ["[intro]", "[verse]", "[hook]", "[verse]", "[hook]", "[bridge]", "[outro]"],
+                ["[verse]", "[hook]", "[verse]", "[hook]", "[verse]", "[outro]"],
+                ["[intro]", "[hook]", "[verse]", "[hook]", "[verse]", "[hook]", "[outro]"],
+                ["[intro]", "[verse]", "[verse]", "[hook]", "[bridge]", "[hook]", "[outro]"],
+                ["[verse]", "[verse]", "[hook]", "[verse]", "[hook]", "[outro]"],
+                ["[intro]", "[verse]", "[hook]", "[bridge]", "[verse]", "[hook]", "[outro]"],
+                ["[hook]", "[verse]", "[verse]", "[hook]", "[bridge]", "[hook]", "[outro]"],
+            ]
+        else:
+            pool = [
+                ["[intro]", "[verse]", "[hook]", "[verse]", "[hook]", "[bridge]", "[verse]", "[hook]", "[outro]"],
+                ["[verse]", "[hook]", "[verse]", "[hook]", "[bridge]", "[verse]", "[hook]", "[outro]"],
+                ["[intro]", "[hook]", "[verse]", "[hook]", "[verse]", "[bridge]", "[hook]", "[outro]"],
+                ["[intro]", "[verse]", "[verse]", "[hook]", "[bridge]", "[verse]", "[hook]", "[hook]", "[outro]"],
+                ["[verse]", "[hook]", "[verse]", "[hook]", "[verse]", "[hook]", "[outro]"],
+            ]
     else:
-        pool = [
-            ["[intro]", "[verse]", "[pre-chorus]", "[chorus]", "[verse]", "[chorus]", "[bridge]", "[chorus]", "[outro]"],
-            ["[intro]", "[verse]", "[chorus]", "[verse]", "[chorus]", "[verse]", "[bridge]", "[outro]"],
-            ["[intro]", "[chorus]", "[verse]", "[pre-chorus]", "[chorus]", "[verse]", "[chorus]", "[bridge]", "[outro]"],
-            ["[intro]", "[verse]", "[verse]", "[chorus]", "[chorus]", "[bridge]", "[verse]", "[chorus]", "[outro]"],
-            ["[intro]", "[verse]", "[pre-chorus]", "[chorus]", "[bridge]", "[verse]", "[chorus]", "[outro]"],
-        ]
+        if duration <= 90:
+            pool = [
+                ["[intro]", "[verse]", "[chorus]", "[outro]"],
+                ["[verse]", "[chorus]", "[verse]", "[outro]"],
+                ["[intro]", "[chorus]", "[verse]", "[chorus]"],
+                ["[chorus]", "[verse]", "[chorus]", "[outro]"],
+                ["[verse]", "[verse]", "[chorus]", "[outro]"],
+                ["[intro]", "[verse]", "[bridge]", "[chorus]"],
+            ]
+        elif duration <= 130:
+            pool = [
+                ["[intro]", "[verse]", "[chorus]", "[verse]", "[outro]"],
+                ["[intro]", "[verse]", "[pre-chorus]", "[chorus]", "[verse]", "[outro]"],
+                ["[intro]", "[chorus]", "[verse]", "[chorus]", "[bridge]", "[outro]"],
+                ["[verse]", "[chorus]", "[verse]", "[chorus]", "[outro]"],
+                ["[intro]", "[verse]", "[verse]", "[chorus]", "[chorus]", "[outro]"],
+                ["[chorus]", "[verse]", "[chorus]", "[verse]", "[outro]"],
+                ["[intro]", "[verse]", "[chorus]", "[bridge]", "[chorus]", "[outro]"],
+                ["[verse]", "[bridge]", "[chorus]", "[verse]", "[chorus]", "[outro]"],
+                ["[intro]", "[chorus]", "[verse]", "[bridge]", "[outro]"],
+            ]
+        elif duration <= 180:
+            pool = [
+                ["[intro]", "[verse]", "[pre-chorus]", "[chorus]", "[verse]", "[chorus]", "[outro]"],
+                ["[intro]", "[verse]", "[chorus]", "[verse]", "[chorus]", "[bridge]", "[outro]"],
+                ["[intro]", "[chorus]", "[verse]", "[pre-chorus]", "[chorus]", "[bridge]", "[chorus]", "[outro]"],
+                ["[intro]", "[verse]", "[chorus]", "[verse]", "[pre-chorus]", "[chorus]", "[outro]"],
+                ["[intro]", "[verse]", "[verse]", "[chorus]", "[bridge]", "[chorus]", "[outro]"],
+                ["[intro]", "[pre-chorus]", "[chorus]", "[verse]", "[chorus]", "[bridge]", "[outro]"],
+                ["[chorus]", "[verse]", "[chorus]", "[verse]", "[bridge]", "[chorus]", "[outro]"],
+                ["[intro]", "[verse]", "[chorus]", "[bridge]", "[verse]", "[chorus]", "[outro]"],
+                ["[verse]", "[chorus]", "[chorus]", "[verse]", "[bridge]", "[outro]"],
+                ["[intro]", "[verse]", "[bridge]", "[chorus]", "[verse]", "[chorus]", "[outro]"],
+            ]
+        else:
+            pool = [
+                ["[intro]", "[verse]", "[pre-chorus]", "[chorus]", "[verse]", "[chorus]", "[bridge]", "[chorus]", "[outro]"],
+                ["[intro]", "[verse]", "[chorus]", "[verse]", "[chorus]", "[verse]", "[bridge]", "[outro]"],
+                ["[intro]", "[chorus]", "[verse]", "[pre-chorus]", "[chorus]", "[verse]", "[chorus]", "[bridge]", "[outro]"],
+                ["[intro]", "[verse]", "[verse]", "[chorus]", "[chorus]", "[bridge]", "[verse]", "[chorus]", "[outro]"],
+                ["[intro]", "[verse]", "[pre-chorus]", "[chorus]", "[bridge]", "[verse]", "[chorus]", "[outro]"],
+                ["[chorus]", "[verse]", "[chorus]", "[verse]", "[bridge]", "[chorus]", "[verse]", "[chorus]", "[outro]"],
+                ["[intro]", "[verse]", "[chorus]", "[chorus]", "[bridge]", "[verse]", "[chorus]", "[outro]"],
+            ]
 
     secs = random.choice(pool)
     return "\n[inst]\n".join(secs) + "\n[inst]"
@@ -2267,7 +2383,7 @@ def generate_audio_with_stems(job_input: dict) -> dict:
 
     genre      = job_input.get("genre",  "").strip().lower()
     bpm_raw    = job_input.get("bpm")
-    bpm        = int(bpm_raw) if bpm_raw else random.randint(85, 145)
+    bpm        = int(bpm_raw) if bpm_raw else random.randint(100, 145)
     key        = (job_input.get("key") or "").strip()
     mood       = job_input.get("mood",  "").strip().lower()
     style      = job_input.get("style", "").strip()
