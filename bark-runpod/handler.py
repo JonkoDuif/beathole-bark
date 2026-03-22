@@ -81,6 +81,54 @@ _demucs_model      = None
 _DEMUCS_MODEL_NAME = "htdemucs_6s"
 _DEMUCS_SR         = 44100   # htdemucs native sample rate
 
+
+def _llm_is_ready(llm) -> bool:
+    if llm is None:
+        return False
+    for attr in ("llm_initialized", "initialized", "is_initialized", "ready"):
+        if hasattr(llm, attr):
+            try:
+                return bool(getattr(llm, attr))
+            except Exception:
+                pass
+    return False
+
+
+def _pick_lm_backend() -> str:
+    override = (os.environ.get("ACESTEP_LM_BACKEND") or "").strip().lower()
+    if override:
+        return override
+    if not torch.cuda.is_available():
+        return "pt"
+    try:
+        total_gb = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
+    except Exception:
+        return "pt"
+    return "vllm" if total_gb >= 8 else "pt"
+
+
+def _ensure_lm_checkpoint(project_root: str, lm_model: str) -> str:
+    lm_dir = os.path.join(project_root, "checkpoints", lm_model)
+    if os.path.isdir(lm_dir) and os.listdir(lm_dir):
+        print(f"[acestep] LM checkpoint present: {lm_dir}", flush=True)
+        return lm_dir
+
+    repo_id = f"ACE-Step/{lm_model}"
+    print(f"[acestep] LM checkpoint missing — downloading {repo_id} -> {lm_dir}", flush=True)
+    try:
+        from huggingface_hub import snapshot_download
+        snapshot_download(
+            repo_id=repo_id,
+            local_dir=lm_dir,
+            local_dir_use_symlinks=False,
+            token=os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN"),
+        )
+        print(f"[acestep] LM checkpoint downloaded: {lm_dir}", flush=True)
+        return lm_dir
+    except Exception as e:
+        print(f"[acestep] LM checkpoint download failed: {e}", flush=True)
+        return lm_dir
+
 def _patch_low_cpu_mem():
     """
     Monkey-patch PreTrainedModel.from_pretrained to force low_cpu_mem_usage=False.
@@ -141,6 +189,7 @@ def get_handlers():
     project_root = os.environ.get("ACESTEP_PROJECT_ROOT", "/app")
     device       = "cuda" if torch.cuda.is_available() else "cpu"
     lm_model     = os.environ.get("ACESTEP_LM_MODEL", "acestep-5Hz-lm-0.6B")
+    lm_backend   = _pick_lm_backend()
 
     print(f"[acestep] Loading handlers (device={device}, project_root={project_root})...", flush=True)
 
@@ -189,8 +238,27 @@ def get_handlers():
     _llm_handler = _LLMHandlerClass()
     lm_checkpoint_dir = os.path.join(project_root, "checkpoints")
     try:
-        _llm_handler.initialize(checkpoint_dir=lm_checkpoint_dir, lm_model_path=lm_model, device=device)
-        print("[acestep] LLM handler initialized", flush=True)
+        _ensure_lm_checkpoint(project_root, lm_model)
+        init_kwargs = {
+            "checkpoint_dir": lm_checkpoint_dir,
+            "lm_model_path": lm_model,
+            "device": device,
+        }
+        try:
+            init_kwargs["backend"] = lm_backend
+            init_result = _llm_handler.initialize(**init_kwargs)
+        except TypeError:
+            init_kwargs.pop("backend", None)
+            init_result = _llm_handler.initialize(**init_kwargs)
+
+        ready = _llm_is_ready(_llm_handler)
+        print(f"[acestep] LLM init result: {init_result!r}", flush=True)
+        print(f"[acestep] LLM backend={lm_backend} | ready={ready}", flush=True)
+        if not ready:
+            print("[acestep] LLM init completed but handler is not ready", flush=True)
+            _llm_handler = None
+        else:
+            print("[acestep] LLM handler initialized", flush=True)
     except Exception as lm_err:
         print(f"[acestep] LLM init failed (non-fatal): {lm_err}", flush=True)
         _llm_handler = None
@@ -2289,7 +2357,7 @@ def _enhance_native_params(llm, job_input: dict, caption: str, lyrics: str,
                            prompt: str, genre: str, mood: str, bpm, key: str,
                            duration: float):
     """Use ACE-Step's own LLM helpers to match the hosted simple-mode prompt flow."""
-    if llm is None or _ace_create_sample is None or _ace_format_sample is None:
+    if llm is None or not _llm_is_ready(llm) or _ace_create_sample is None or _ace_format_sample is None:
         return caption, lyrics, bpm, key, int(duration), None
 
     try:
@@ -2380,6 +2448,11 @@ def _build_generation_params(job_input: dict, duration: float, bpm: int, key: st
             key=key,
             duration=duration,
         )
+        if not (llm and _llm_is_ready(llm)):
+            fallback_caption = build_tags(prompt or style or caption, genre, mood, bpm, key)
+            print("[acestep] Native mode requested but LLM is unavailable — falling back to enriched caption builder", flush=True)
+            print(f"[acestep] Fallback caption: {fallback_caption}", flush=True)
+            caption = fallback_caption
     else:
         caption = build_tags(prompt or style, genre, mood, bpm, key)
         lyrics = _build_lyrics_structure(duration, prompt, genre)
