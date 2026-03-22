@@ -28,6 +28,14 @@ except Exception as e:
 
 try:
     from acestep.inference import GenerationParams, GenerationConfig, generate_music
+    try:
+        from acestep.inference import (
+            create_sample as _ace_create_sample,
+            format_sample as _ace_format_sample,
+        )
+    except ImportError:
+        _ace_create_sample = None
+        _ace_format_sample = None
     print("[startup] ACE-Step inference OK", flush=True)
 except Exception as e:
     print(f"[startup] ACE-STEP INFERENCE ERROR: {e}", flush=True); sys.exit(1)
@@ -2257,6 +2265,85 @@ def _native_guidance(job_input: dict, genre: str, prompt: str = "") -> float:
     return _get_guidance_scale(genre, prompt)
 
 
+def _sample_value(sample, *keys, default=None):
+    for key in keys:
+        if hasattr(sample, key):
+            value = getattr(sample, key)
+            if value not in (None, ""):
+                return value
+        if isinstance(sample, dict):
+            value = sample.get(key)
+            if value not in (None, ""):
+                return value
+    return default
+
+
+def _looks_instrumental(job_input: dict, lyrics: str, prompt: str) -> bool:
+    if _to_bool(_job_value(job_input, "instrumental", "isInstrumental", "is_instrumental"), default=False):
+        return True
+    text = f"{lyrics or ''}\n{prompt or ''}".lower()
+    return any(tag in text for tag in ("[inst]", "[instrumental]", "instrumental", "no vocals"))
+
+
+def _enhance_native_params(llm, job_input: dict, caption: str, lyrics: str,
+                           prompt: str, genre: str, mood: str, bpm, key: str,
+                           duration: float):
+    """Use ACE-Step's own LLM helpers to match the hosted simple-mode prompt flow."""
+    if llm is None or _ace_create_sample is None or _ace_format_sample is None:
+        return caption, lyrics, bpm, key, int(duration), None
+
+    try:
+        use_format = bool((lyrics or "").strip() and (lyrics or "").strip() != "[inst]")
+        user_metadata = {
+            "bpm": bpm or None,
+            "keyscale": key or None,
+            "duration": int(duration) if duration else None,
+            "genre": genre or None,
+            "mood": mood or None,
+            "instrumental": _looks_instrumental(job_input, lyrics, prompt or caption),
+        }
+        user_metadata = {k: v for k, v in user_metadata.items() if v not in (None, "")}
+
+        if use_format:
+            sample = _ace_format_sample(
+                llm_handler=llm,
+                caption=caption,
+                lyrics=lyrics,
+                user_metadata=user_metadata or None,
+                use_constrained_decoding=True,
+            )
+        else:
+            query = prompt or caption
+            sample = _ace_create_sample(
+                llm_handler=llm,
+                query=query,
+                instrumental=_looks_instrumental(job_input, lyrics, query),
+                use_constrained_decoding=True,
+            )
+
+        success = _sample_value(sample, "success", default=True)
+        if success is False:
+            err = _sample_value(sample, "error", default="unknown error")
+            print(f"[acestep] Native sample enhancement failed: {err}", flush=True)
+            return caption, lyrics, bpm, key, int(duration), None
+
+        out_caption = _sample_value(sample, "caption", default=caption) or caption
+        out_lyrics = _sample_value(sample, "lyrics", default=lyrics or "[inst]") or "[inst]"
+        out_bpm = _sample_value(sample, "bpm", default=bpm)
+        out_key = _sample_value(sample, "keyscale", "key_scale", default=key)
+        out_duration = _sample_value(sample, "duration", "audio_duration", default=int(duration))
+        out_language = _sample_value(sample, "language", "vocal_language")
+
+        print(f"[acestep] Native prompt enhanced via {'format_sample' if use_format else 'create_sample'}", flush=True)
+        print(f"[acestep] Enhanced caption: {out_caption}", flush=True)
+        print(f"[acestep] Enhanced lyrics: {out_lyrics}", flush=True)
+        print(f"[acestep] Enhanced metas: bpm={out_bpm} key={out_key} duration={out_duration} language={out_language}", flush=True)
+        return out_caption, out_lyrics, out_bpm, out_key, out_duration, out_language
+    except Exception as e:
+        print(f"[acestep] Native prompt enhancement skipped: {e}", flush=True)
+        return caption, lyrics, bpm, key, int(duration), None
+
+
 def _apply_optional_param(params: GenerationParams, attr: str, value):
     if value is None or not hasattr(params, attr):
         return
@@ -2268,7 +2355,7 @@ def _apply_optional_param(params: GenerationParams, attr: str, value):
 
 def _build_generation_params(job_input: dict, duration: float, bpm: int, key: str,
                              genre: str, mood: str, style: str, prompt: str,
-                             infer_step: int, seed: int) -> tuple[GenerationParams, str, str, str, float]:
+                             infer_step: int, seed: int, llm=None) -> tuple[GenerationParams, str, str, str, float]:
     prompt_mode = str(_job_value(
         job_input,
         "promptMode",
@@ -2281,10 +2368,23 @@ def _build_generation_params(job_input: dict, duration: float, bpm: int, key: st
         caption = _native_caption(job_input, bpm, key)
         lyrics = _native_lyrics(job_input)
         guidance_scale = _native_guidance(job_input, genre, prompt)
+        caption, lyrics, bpm, key, duration, vocal_language = _enhance_native_params(
+            llm=llm,
+            job_input=job_input,
+            caption=caption,
+            lyrics=lyrics,
+            prompt=prompt,
+            genre=genre,
+            mood=mood,
+            bpm=bpm,
+            key=key,
+            duration=duration,
+        )
     else:
         caption = build_tags(prompt or style, genre, mood, bpm, key)
         lyrics = _build_lyrics_structure(duration, prompt, genre)
         guidance_scale = _get_guidance_scale(genre, prompt)
+        vocal_language = None
 
     params = GenerationParams(
         task_type="text2music",
@@ -2298,6 +2398,19 @@ def _build_generation_params(job_input: dict, duration: float, bpm: int, key: st
         guidance_scale=guidance_scale,
         seed=seed,
     )
+
+    if vocal_language and hasattr(params, "vocal_language"):
+        params.vocal_language = vocal_language
+    if native_mode and hasattr(params, "thinking"):
+        params.thinking = True
+    if native_mode and hasattr(params, "use_cot_metas"):
+        params.use_cot_metas = False
+    if native_mode and hasattr(params, "use_cot_caption"):
+        params.use_cot_caption = False
+    if native_mode and hasattr(params, "use_cot_language"):
+        params.use_cot_language = False
+    if native_mode and hasattr(params, "use_constrained_decoding"):
+        params.use_constrained_decoding = True
 
     if native_mode:
         optional_fields = {
@@ -2553,7 +2666,7 @@ def generate_audio_with_stems(job_input: dict) -> dict:
 
     genre      = job_input.get("genre",  "").strip().lower()
     bpm_raw    = job_input.get("bpm")
-    bpm        = int(bpm_raw) if bpm_raw else random.randint(100, 145)
+    bpm        = int(bpm_raw) if bpm_raw not in (None, "", 0, "0") else None
     key        = (job_input.get("key") or "").strip()
     mood       = job_input.get("mood",  "").strip().lower()
     style      = job_input.get("style", "").strip()
@@ -2575,12 +2688,13 @@ def generate_audio_with_stems(job_input: dict) -> dict:
         prompt=user_prompt,
         infer_step=infer_step,
         seed=seed,
+        llm=llm,
     )
 
     print(f"[gen] Prompt mode: {prompt_mode}", flush=True)
     print(f"[gen] Caption: {tags}", flush=True)
     print(f"[gen] Lyrics: {lyrics_str}", flush=True)
-    print(f"[gen] Duration: {duration:.0f}s | BPM: {bpm} | Key: {key} | Seed: {seed} | guidance={g_scale}", flush=True)
+    print(f"[gen] Duration: {full_params.duration:.0f}s | BPM: {full_params.bpm} | Key: {full_params.keyscale} | Seed: {seed} | guidance={g_scale}", flush=True)
 
     # Handle reference audio → temp file
     ref_path = None
@@ -2591,7 +2705,7 @@ def generate_audio_with_stems(job_input: dict) -> dict:
         print(f"[gen] Reference audio saved", flush=True)
 
     # ── 1. Generate the full beat (text2music) ────────────────────────────────
-    print(f"[gen] Generating full beat ({duration:.0f}s, {bpm} BPM, seed={seed})...", flush=True)
+    print(f"[gen] Generating full beat ({full_params.duration:.0f}s, {full_params.bpm} BPM, seed={seed})...", flush=True)
     if ref_path:
         full_params.audio2audio_enable = True
         full_params.ref_audio_input    = ref_path
@@ -2650,8 +2764,8 @@ def generate_audio_with_stems(job_input: dict) -> dict:
         "stem_urls":        stem_urls,
         "sample_rate":      SAMPLE_RATE,
         "duration_seconds": round(actual_dur, 2),
-        "bpm":              bpm,
-        "key":              key,
+        "bpm":              full_params.bpm,
+        "key":              full_params.keyscale,
         "tags":             tags,
         "lyrics":           lyrics_str,
         "prompt_mode":      prompt_mode,
@@ -2664,7 +2778,8 @@ def generate_preview_audio(job_input: dict) -> tuple:
 
     genre  = job_input.get("genre",  "").strip().lower()
     mood   = job_input.get("mood",   "").strip().lower()
-    bpm    = int(job_input.get("bpm") or 120)
+    bpm_raw = job_input.get("bpm")
+    bpm    = int(bpm_raw) if bpm_raw not in (None, "", 0, "0") else None
     key    = (job_input.get("key") or "").strip()
     prompt = (job_input.get("prompt") or job_input.get("style") or "").strip()
 
@@ -2680,6 +2795,7 @@ def generate_preview_audio(job_input: dict) -> tuple:
         prompt=prompt,
         infer_step=int(_job_value(job_input, "inferSteps", "infer_step", default=20)),
         seed=seed,
+        llm=llm,
     )
     print(f"[midi-preview] Generating 60s preview...", flush=True)
     print(f"[midi-preview] Prompt mode: {prompt_mode} | guidance={guidance_scale}", flush=True)
@@ -3267,7 +3383,8 @@ def generate_midi_from_audio(job_input: dict) -> dict:
 
     genre  = job_input.get("genre",  "").strip().lower()
     mood   = job_input.get("mood",   "").strip().lower()
-    bpm    = int(job_input.get("bpm") or 120)
+    bpm_raw = job_input.get("bpm")
+    bpm    = int(bpm_raw) if bpm_raw not in (None, "", 0, "0") else None
     key    = (job_input.get("key") or "").strip()
     prompt = (job_input.get("prompt") or job_input.get("style") or "").strip()
     style  = job_input.get("style", "").strip()
@@ -3290,6 +3407,7 @@ def generate_midi_from_audio(job_input: dict) -> dict:
         prompt=prompt,
         infer_step=20,
         seed=seed,
+        llm=llm,
     )
 
     # ── 1. Generate full beat ─────────────────────────────────────────────────
@@ -3300,7 +3418,8 @@ def generate_midi_from_audio(job_input: dict) -> dict:
     full_beat_path = _ace_generate(dit, llm, full_params, "/tmp/bh_midi_main.wav")
     main_audio     = _read_audio(full_beat_path)
     actual_dur     = (len(main_audio) if main_audio.ndim == 1 else main_audio.shape[0]) / SAMPLE_RATE
-    total_beats    = round(actual_dur * bpm / 60)
+    effective_bpm  = full_params.bpm or 120
+    total_beats    = round(actual_dur * effective_bpm / 60)
     print(f"[midi-gen] Beat done — {actual_dur:.1f}s", flush=True)
 
     # ── 2. Separate stems with Demucs + transcribe all stems to MIDI ──────────

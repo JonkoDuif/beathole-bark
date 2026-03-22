@@ -86,7 +86,15 @@ const buildStabilityPrompt = ({ genre, mood, bpm, style, key, prompt }) => {
 
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
-const generateBeat = async ({ genre, mood, bpm, style, title, key, prompt, duration, beatType, beatId, referenceAudio, referenceStrength }) => {
+const generateBeat = async ({
+  genre, mood, bpm, style, title, key, prompt, duration, beatType, beatId,
+  referenceAudio, referenceStrength,
+  promptMode, caption, lyrics, inferSteps, guidanceScale,
+  schedulerType, cfgType, omegaScale, guidanceInterval,
+  guidanceIntervalDecay, minGuidanceScale, useErgTag,
+  useErgLyric, useErgDiffusion, ossSteps,
+  guidanceScaleText, guidanceScaleLyric, seed,
+}) => {
   // null/undefined = user chose "Random" → pick 120–240s
   const targetDuration = duration || (Math.floor(Math.random() * 121) + 120); // 120–240s random
   console.log(`🎵 Generating: "${title}" | genre=${genre} | ${targetDuration}s | mode=${beatType || 'audio'}`);
@@ -98,7 +106,15 @@ const generateBeat = async ({ genre, mood, bpm, style, title, key, prompt, durat
 
   // 2. ACE-Step / MusicGen via RunPod
   if (process.env.BARK_API_URL) {
-    return await callMusicGenRunPod({ genre, mood, bpm, style, key, prompt, duration: targetDuration, beatType, beatId, referenceAudio, referenceStrength });
+    return await callMusicGenRunPod({
+      genre, mood, bpm, style, key, prompt, duration: targetDuration, beatType, beatId,
+      referenceAudio, referenceStrength,
+      promptMode, caption, lyrics, inferSteps, guidanceScale,
+      schedulerType, cfgType, omegaScale, guidanceInterval,
+      guidanceIntervalDecay, minGuidanceScale, useErgTag,
+      useErgLyric, useErgDiffusion, ossSteps,
+      guidanceScaleText, guidanceScaleLyric, seed,
+    });
   }
 
   // 3. Mock (dev)
@@ -162,7 +178,15 @@ const callStabilityAudio = async ({ genre, mood, bpm, style, key, prompt, durati
 
 // ─── MusicGen via RunPod ──────────────────────────────────────────────────────
 
-const callMusicGenRunPod = async ({ genre, mood, bpm, style, key, prompt, duration, beatType, beatId, referenceAudio, referenceStrength }) => {
+const callMusicGenRunPod = async ({
+  genre, mood, bpm, style, key, prompt, duration, beatType, beatId,
+  referenceAudio, referenceStrength,
+  promptMode, caption, lyrics, inferSteps, guidanceScale,
+  schedulerType, cfgType, omegaScale, guidanceInterval,
+  guidanceIntervalDecay, minGuidanceScale, useErgTag,
+  useErgLyric, useErgDiffusion, ossSteps,
+  guidanceScaleText, guidanceScaleLyric, seed,
+}) => {
   const baseUrl = process.env.BARK_API_URL;
   const apiKey  = process.env.RUNPOD_API_KEY;
   const generationId = uuidv4();
@@ -180,7 +204,7 @@ const callMusicGenRunPod = async ({ genre, mood, bpm, style, key, prompt, durati
         genre:       genre  || '',
         style:       style  || '',
         mood:        mood   || '',
-        bpm:         bpm    || 140,
+        bpm:         bpm    || undefined,
         key:         key    || '',
         prompt:      prompt || '',   // user's extra free-text only
         duration:    clampedDuration,
@@ -188,6 +212,24 @@ const callMusicGenRunPod = async ({ genre, mood, bpm, style, key, prompt, durati
         beatId:            beatId || '',
         referenceAudio:    referenceAudio    || undefined,
         referenceStrength: referenceStrength || undefined,
+        promptMode:        promptMode || process.env.ACESTEP_PROMPT_MODE || 'native',
+        caption:           caption || undefined,
+        lyrics:            lyrics || undefined,
+        inferSteps:        inferSteps ?? undefined,
+        guidanceScale:     guidanceScale ?? undefined,
+        schedulerType:     schedulerType || undefined,
+        cfgType:           cfgType || undefined,
+        omegaScale:        omegaScale ?? undefined,
+        guidanceInterval:  guidanceInterval ?? undefined,
+        guidanceIntervalDecay: guidanceIntervalDecay ?? undefined,
+        minGuidanceScale:  minGuidanceScale ?? undefined,
+        useErgTag:         useErgTag ?? undefined,
+        useErgLyric:       useErgLyric ?? undefined,
+        useErgDiffusion:   useErgDiffusion ?? undefined,
+        ossSteps:          ossSteps || undefined,
+        guidanceScaleText: guidanceScaleText ?? undefined,
+        guidanceScaleLyric: guidanceScaleLyric ?? undefined,
+        seed:              seed ?? undefined,
       },
     },
     {
