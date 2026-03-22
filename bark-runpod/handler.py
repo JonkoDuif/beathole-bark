@@ -2358,7 +2358,7 @@ def _enhance_native_params(llm, job_input: dict, caption: str, lyrics: str,
                            duration: float):
     """Use ACE-Step's own LLM helpers to match the hosted simple-mode prompt flow."""
     if llm is None or not _llm_is_ready(llm) or _ace_create_sample is None or _ace_format_sample is None:
-        return caption, lyrics, bpm, key, int(duration), None
+        return caption, lyrics, bpm, key, int(duration), None, False
 
     try:
         use_format = bool((lyrics or "").strip() and (lyrics or "").strip() != "[inst]")
@@ -2393,7 +2393,7 @@ def _enhance_native_params(llm, job_input: dict, caption: str, lyrics: str,
         if success is False:
             err = _sample_value(sample, "error", default="unknown error")
             print(f"[acestep] Native sample enhancement failed: {err}", flush=True)
-            return caption, lyrics, bpm, key, int(duration), None
+            return caption, lyrics, bpm, key, int(duration), None, False
 
         out_caption = _sample_value(sample, "caption", default=caption) or caption
         out_lyrics = _sample_value(sample, "lyrics", default=lyrics or "[inst]") or "[inst]"
@@ -2406,10 +2406,10 @@ def _enhance_native_params(llm, job_input: dict, caption: str, lyrics: str,
         print(f"[acestep] Enhanced caption: {out_caption}", flush=True)
         print(f"[acestep] Enhanced lyrics: {out_lyrics}", flush=True)
         print(f"[acestep] Enhanced metas: bpm={out_bpm} key={out_key} duration={out_duration} language={out_language}", flush=True)
-        return out_caption, out_lyrics, out_bpm, out_key, out_duration, out_language
+        return out_caption, out_lyrics, out_bpm, out_key, out_duration, out_language, True
     except Exception as e:
         print(f"[acestep] Native prompt enhancement skipped: {e}", flush=True)
-        return caption, lyrics, bpm, key, int(duration), None
+        return caption, lyrics, bpm, key, int(duration), None, False
 
 
 def _apply_optional_param(params: GenerationParams, attr: str, value):
@@ -2436,7 +2436,7 @@ def _build_generation_params(job_input: dict, duration: float, bpm: int, key: st
         caption = _native_caption(job_input, bpm, key)
         lyrics = _native_lyrics(job_input)
         guidance_scale = _native_guidance(job_input, genre, prompt)
-        caption, lyrics, bpm, key, duration, vocal_language = _enhance_native_params(
+        caption, lyrics, bpm, key, duration, vocal_language, native_enhanced = _enhance_native_params(
             llm=llm,
             job_input=job_input,
             caption=caption,
@@ -2448,9 +2448,9 @@ def _build_generation_params(job_input: dict, duration: float, bpm: int, key: st
             key=key,
             duration=duration,
         )
-        if not (llm and _llm_is_ready(llm)):
+        if not native_enhanced:
             fallback_caption = build_tags(prompt or style or caption, genre, mood, bpm, key)
-            print("[acestep] Native mode requested but LLM is unavailable — falling back to enriched caption builder", flush=True)
+            print("[acestep] Native mode could not use ACE-Step LLM prompt expansion — falling back to enriched caption builder", flush=True)
             print(f"[acestep] Fallback caption: {fallback_caption}", flush=True)
             caption = fallback_caption
     else:
@@ -2458,6 +2458,7 @@ def _build_generation_params(job_input: dict, duration: float, bpm: int, key: st
         lyrics = _build_lyrics_structure(duration, prompt, genre)
         guidance_scale = _get_guidance_scale(genre, prompt)
         vocal_language = None
+        native_enhanced = False
 
     params = GenerationParams(
         task_type="text2music",
@@ -2475,7 +2476,9 @@ def _build_generation_params(job_input: dict, duration: float, bpm: int, key: st
     if vocal_language and hasattr(params, "vocal_language"):
         params.vocal_language = vocal_language
     if native_mode and hasattr(params, "thinking"):
-        params.thinking = True
+        # Keep LM out of the main generation pass. In this runtime the 5Hz LM can
+        # be usable for prompt expansion but fails inside ACE-Step's llm_dit path.
+        params.thinking = False
     if native_mode and hasattr(params, "use_cot_metas"):
         params.use_cot_metas = False
     if native_mode and hasattr(params, "use_cot_caption"):
@@ -2483,7 +2486,7 @@ def _build_generation_params(job_input: dict, duration: float, bpm: int, key: st
     if native_mode and hasattr(params, "use_cot_language"):
         params.use_cot_language = False
     if native_mode and hasattr(params, "use_constrained_decoding"):
-        params.use_constrained_decoding = True
+        params.use_constrained_decoding = False
 
     if native_mode:
         optional_fields = {
