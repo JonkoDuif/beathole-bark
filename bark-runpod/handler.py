@@ -1714,6 +1714,86 @@ _PRODUCTION_TECHNIQUES = [
 ]
 
 
+_GENRE_ALIASES = {
+    "hiphop": "hip hop",
+    "hip-hop": "hip hop",
+    "uk drill": "drill",
+    "brooklyn drill": "drill",
+    "ny drill": "drill",
+    "new york drill": "drill",
+    "drill type beat": "drill",
+    "trap type beat": "trap",
+    "boom-bap": "boom bap",
+    "lofi": "lo-fi",
+    "lo fi": "lo-fi",
+    "rnb": "r&b",
+    "rhythm and blues": "r&b",
+    "dnb": "drum and bass",
+    "drum n bass": "drum and bass",
+    "drum & bass": "drum and bass",
+    "ukg": "uk garage",
+}
+
+
+def _infer_genre_from_prompt(prompt: str) -> str:
+    p = (prompt or "").lower()
+    if not p:
+        return ""
+
+    alias_items = sorted(_GENRE_ALIASES.items(), key=lambda kv: len(kv[0]), reverse=True)
+    for alias, genre in alias_items:
+        if alias in p:
+            return genre
+
+    genre_keys = sorted(set(GENRE_VARIANTS.keys()) | set(_GENRE_DEFAULT_BPM.keys()), key=len, reverse=True)
+    for genre in genre_keys:
+        if genre and genre in p:
+            return genre
+    return ""
+
+
+def _infer_mood_from_prompt(prompt: str) -> str:
+    p = (prompt or "").lower()
+    if not p:
+        return ""
+    mood_keys = sorted(set(MOOD_VARIANTS.keys()) | _DARK_SAD_MOODS, key=len, reverse=True)
+    for mood in mood_keys:
+        if mood and mood in p:
+            return mood
+    return ""
+
+
+def _infer_bpm_from_prompt(prompt: str, genre: str):
+    p = (prompt or "").lower()
+    if p:
+        import re
+        match = re.search(r"\b(\d{2,3})\s*bpm\b", p)
+        if match:
+            try:
+                bpm = int(match.group(1))
+                if 40 <= bpm <= 240:
+                    return bpm
+            except Exception:
+                pass
+
+    bpm_hint = _GENRE_DEFAULT_BPM.get(genre or "")
+    if bpm_hint and "-" in bpm_hint:
+        try:
+            lo, hi = bpm_hint.split("-", 1)
+            return int((int(lo.strip()) + int(hi.split()[0].strip())) / 2)
+        except Exception:
+            return None
+    return None
+
+
+def _resolve_prompt_context(prompt: str, genre: str, mood: str, bpm, key: str):
+    resolved_genre = genre or _infer_genre_from_prompt(prompt)
+    resolved_mood = mood or _infer_mood_from_prompt(prompt)
+    resolved_bpm = bpm if bpm not in (None, "", 0, "0") else _infer_bpm_from_prompt(prompt, resolved_genre)
+    resolved_key = key or ""
+    return resolved_genre, resolved_mood, resolved_bpm, resolved_key
+
+
 def build_tags(prompt: str, genre: str, mood: str, bpm: int, key: str) -> str:
     g = genre.lower().strip() if genre else ""
     m = mood.lower().strip() if mood else ""
@@ -2431,6 +2511,7 @@ def _build_generation_params(job_input: dict, duration: float, bpm: int, key: st
         default=os.environ.get("ACESTEP_PROMPT_MODE", "native"),
     )).strip().lower()
     native_mode = prompt_mode in {"native", "ace", "ace-step", "acestep"}
+    genre, mood, bpm, key = _resolve_prompt_context(prompt or style or "", genre, mood, bpm, key)
 
     if native_mode:
         caption = _native_caption(job_input, bpm, key)
